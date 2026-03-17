@@ -3,6 +3,11 @@ from enum import Enum
 from typing import List, Dict, Optional, Any
 import math
 
+"""
+this is the old engine code, it is not used in the current version of the game
+"""
+
+# this class describes the various land types available for each country
 class LandType(Enum):
     URBAN = "urban"
     AGRICULTURAL = "agricultural"
@@ -10,6 +15,8 @@ class LandType(Enum):
     MINERAL = "mineral"
     STRATEGIC = "strategic"
 
+# this class describes the various structures available for each country
+#   - each structure has a cost, build time, and production rate
 class StructureType(Enum):
     FARM = "farm"
     POWER_PLANT = "power_plant"
@@ -20,6 +27,7 @@ class StructureType(Enum):
     FACTORY = "factory"
     RESEARCH_LAB = "research_lab"
 
+# this class describes a single square of land
 @dataclass
 class LandSquare:
     square_id: str
@@ -29,6 +37,7 @@ class LandSquare:
     under_construction_structure: Optional[StructureType] = None
     build_time_remaining: int = 0
 
+# this class describes the state of a single country
 @dataclass
 class CountryState:
     name: str
@@ -42,6 +51,9 @@ class CountryState:
     military_power: float
     reputation: float = 1.0
 
+# this class describes the actions that can be taken by each country
+#   - each action has a type, target country, resource type, amount, 
+#     square id, structure type, and parameters
 @dataclass
 class AgentAction:
     action_type: str  # e.g., "build", "trade", "war"
@@ -52,6 +64,8 @@ class AgentAction:
     structure_type: Optional[StructureType] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
 
+# this class describes the entire game world
+#   - it has a current turn and a dictionary of countries
 @dataclass
 class GameWorld:
     current_turn: int

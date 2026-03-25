@@ -11,28 +11,58 @@ class GameMap:
         self._generate_map()
     
     def _generate_map(self):
-        """Generate a simple random map"""
+        """Generate map using cellular automata for continents"""
+        # Step 1: Initialize random noise
+        temp_grid = []
         for y in range(self.height):
             row = []
             for x in range(self.width):
-                # Simple terrain generation
-                rand = random.random()
-                if rand < 0.2:
-                    terrain = Terrain.MOUNTAIN
-                elif rand < 0.3:
+                row.append(1 if random.random() < 0.55 else 0) # 1 is land, 0 is water
+            temp_grid.append(row)
+            
+        # Step 2: Smooth with cellular automata rules
+        for _ in range(4):
+            new_grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+            for y in range(self.height):
+                for x in range(self.width):
+                    # count land neighbors
+                    land_count = 0
+                    for dy in [-1, 0, 1]:
+                        for dx in [-1, 0, 1]:
+                            nx, ny = x + dx, y + dy
+                            if 0 <= nx < self.width and 0 <= ny < self.height:
+                                land_count += temp_grid[ny][nx]
+                            else:
+                                land_count += 0 # Water at borders
+                    
+                    if land_count >= 5 or (land_count == 4 and temp_grid[y][x] == 1):
+                        new_grid[y][x] = 1
+                    else:
+                        new_grid[y][x] = 0
+            temp_grid = new_grid
+            
+        # Step 3: Assign specific terrains and features
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                if temp_grid[y][x] == 0:
                     terrain = Terrain.WATER
-                elif rand < 0.5:
-                    terrain = Terrain.HILL
-                elif rand < 0.7:
-                    terrain = Terrain.PLAINS
                 else:
-                    terrain = Terrain.GRASS
+                    rand = random.random()
+                    if rand < 0.15:
+                        terrain = Terrain.MOUNTAIN
+                    elif rand < 0.35:
+                        terrain = Terrain.HILL
+                    elif rand < 0.65:
+                        terrain = Terrain.PLAINS
+                    else:
+                        terrain = Terrain.GRASS
                 
                 # Features
                 feature = Feature.NONE
-                if terrain != Terrain.WATER and random.random() < 0.3:
+                if terrain != Terrain.WATER and random.random() < 0.25:
                     feature = Feature.FOREST
-                elif terrain != Terrain.WATER and random.random() < 0.2:
+                elif terrain != Terrain.WATER and random.random() < 0.15:
                     feature = Feature.RESOURCE
                 
                 tile = Tile(terrain=terrain, feature=feature, x=x, y=y)

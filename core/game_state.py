@@ -1,134 +1,172 @@
-# core/game_state.py
-from typing import Dict, List, Optional, Tuple
-from .constants import Tech, Civic, UnitType, District, Terrain
-from .models import City, Unit, Player, Tile
-from .map import GameMap
+import random
+from typing import Dict, List, Optional
+from typing import Dict, Optional, List
+from .constants import Resource, DiplomaticState, TECH_COSTS, CIVIC_COSTS
+from .models import Nation, Achievements
+
 
 class GameState:
-    def __init__(self, width: int = 10, height: int = 10, num_players: int = 2):
-        self.map = GameMap(width, height)
-        self.players: Dict[int, Player] = {}
-        self.cities: Dict[str, City] = {}
-        self.units: Dict[str, Unit] = {}
-        self.turn: int = 0
+    def __init__(self, num_players: int = 4):
+        self.nations: Dict[int, Nation] = {}
+        self.turn: int = 1
         self.current_player: int = 0
         
-        # Initialize players
+        # Diplomatic matrix: dict of dicts diplomacy[id1][id2] = DiplomaticState
+        self.diplomacy: Dict[int, Dict[int, DiplomaticState]] = {}
+        
+        # Generate some flavor names
+        NATION_NAMES = ["Valnor", "Zephyria", "Ironforge", "Aeldria", "Crimson Order", "Sunpeak", "Mercia"]
+        PERSONALITIES = ["WARMONGER", "SCIENTIST", "MERCHANT", "DIPLOMAT", "BALANCED"]
+        
         for i in range(num_players):
-            self.players[i] = Player(id=i)
-        
-        # Place starting cities
-        self._place_starting_cities()
+            name = NATION_NAMES[i % len(NATION_NAMES)]
+            color = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"][i]
+            pers = random.choice(PERSONALITIES)
+            
+            n = Nation(id=i, name=name, color=color, personality=pers)
+            
+            # Start with some base yields randomly shifted for asymmetry
+            n.gold_yield = random.randint(10, 20)
+            n.manpower_yield = random.randint(10, 20)
+            n.production_yield = random.randint(2, 8)
+            
+            self.nations[i] = n
+            self.diplomacy[i] = {}
+            for j in range(num_players):
+                self.diplomacy[i][j] = DiplomaticState.NEUTRAL
+                    
+    def process_turn_updates(self):
+        """Called automatically at the end of simultaneous resolution"""
+        for n_id, nation in self.nations.items():
+            if nation.is_defeated:
+                continue
+            
+            # Reset AP and Queue
+            nation.action_points = nation.max_action_points
+            nation.queued_actions.clear()
+            
+            # Assess War Exhaustion
+            at_war_with = [oid for oid, st in self.diplomacy[nation.id].items() if st == DiplomaticState.WAR and not self.nations[oid].is_defeated]
+            if at_war_with:
+                nation.war_exhaustion += 1
+            else:
+                nation.war_exhaustion = max(0, nation.war_exhaustion - 2)
+
+            # Apply passive yields
+            # Calculate modifiers
+            prod_mod = 1.0
+            if "Steam Power" in nation.unlocked_techs: prod_mod += 0.25
+            
+            gold_mod = 1.0
+            if nation.achievements.golden_age: gold_mod += 0.25
+            gold_mod += (0.15 * len(nation.active_trade_agreements))
+            
+            sci_mod = 1.0
+            sci_mod += (0.15 * len(nation.active_research_pacts))
+            
+            manpower_mod = 1.0
+            if nation.achievements.national_identity: manpower_mod += 0.20
+            if nation.achievements.levies: manpower_mod += 0.10
+            
+            # War exhaustion penalty to manpower
+            manpower_mod -= (0.05 * nation.war_exhaustion)
+            manpower_mod = max(0.1, manpower_mod) # heavily crippled but not backwards
+            
+            # Base generation + Annexation yields
+            nation.gold += int((nation.gold_yield + nation.absorbed_gold_yield) * gold_mod)
+            nation.manpower += int(nation.manpower_yield * manpower_mod)
+            nation.production += int((nation.production_yield + nation.absorbed_prod_yield) * prod_mod)
+            nation.science += nation.absorbed_sci_yield
+            
+            # Check tech/civic passives
+            if getattr(nation.achievements, 'industrial_revolution', False):
+                nation.science += nation.production // 10
+            if getattr(nation.achievements, 'enlightenment', False):
+                nation.science += nation.manpower // 10
+                
+            # Process Tech
+            if nation.current_tech:
+                nation.tech_progress += nation.science_yield + nation.science
+                nation.science = 0 # consume lump science
+                cost = self.get_tech_cost(nation.current_tech)
+                if nation.tech_progress >= cost:
+                    nation.unlocked_techs.append(nation.current_tech)
+                    nation.current_tech = None
+                    nation.tech_progress = 0
+                    nation.achievements.techs_researched += 1
+                    
+            # Process Civic
+            if nation.current_civic:
+                nation.civic_progress += nation.civic_yield + nation.civics
+                nation.civics = 0
+                cost = self.get_civic_cost(nation.current_civic)
+                if nation.civic_progress >= cost:
+                    nation.unlocked_civics.append(nation.current_civic)
+                    nation.current_civic = None
+                    nation.civic_progress = 0
+                    nation.achievements.civic_policies_adopted += 1
+            
+            # Check constant achievements
+            if nation.gold > 1000:
+                nation.achievements.consecutive_wealth_turns += 1
+                if nation.achievements.consecutive_wealth_turns >= 10:
+                    nation.achievements.mercantilism = True
+            else:
+                nation.achievements.consecutive_wealth_turns = 0
+                
+            if nation.gold >= 5000:
+                nation.achievements.treasury_reserve = True
+                
+            if nation.military > 500:
+                nation.achievements.consecutive_military_turns += 1
+                if nation.achievements.consecutive_military_turns >= 5:
+                    nation.achievements.standing_army = True
+            else:
+                nation.achievements.consecutive_military_turns = 0
+              # Extra Achievements
+            if nation.production_yield >= 500:
+                nation.achievements.industrial_heartland = True
+            if nation.gold > 2000:
+                nation.achievements.surplus_economy = True
+                gold_mod += 0.10
+            if nation.manpower > 1500:
+                nation.achievements.standing_army = True
+            if len(nation.unlocked_techs) >= 3:
+                nation.achievements.university_network = True
+                sci_mod += 0.20
+            if len(nation.unlocked_civics) >= 3:
+                nation.achievements.bureaucracy = True
+                nation.civic_yield = max(nation.civic_yield, int(nation.civic_yield * 1.2))
+                
+    def get_tech_cost(self, tech_name: str) -> int:
+        cost = TECH_COSTS.get(tech_name, 100)
+        # Check modifiers
+        for n in self.nations.values():
+            if tech_name == n.current_tech and n.achievements.scientific_method:
+                return int(cost * 0.85)
+        return cost
+
+    def get_civic_cost(self, civic_name: str) -> int:
+        return CIVIC_COSTS.get(civic_name, 100)
     
-    def _place_starting_cities(self):
-        """Place starting cities for each player"""
-        start_positions = [
-            (2, 2),
-            (self.map.width - 3, self.map.height - 3)
-        ]
+    def get_diplomatic_state(self, id1: int, id2: int) -> DiplomaticState:
+        return self.diplomacy[id1].get(id2, DiplomaticState.NEUTRAL)
         
-        for i, (x, y) in enumerate(start_positions):
-            if i in self.players:
-                city = self._found_city(i, x, y)
-                # Add starting warrior
-                warrior = Unit(
-                    id=f"W_{i}_0",
-                    unit_type=UnitType.WARRIOR,
-                    player_id=i,
-                    x=x + 1,
-                    y=y
-                )
-                self.units[warrior.id] = warrior
-                tile = self.map.get_tile(warrior.x, warrior.y)
-                if tile:
-                    tile.unit = UnitType.WARRIOR
-    
-    def _found_city(self, player_id: int, x: int, y: int) -> City:
-        """Found a new city at location"""
-        city_id = f"C_{player_id}_{len(self.players[player_id].cities)}"
-        city = City(
-            id=city_id,
-            player_id=player_id,
-            x=x,
-            y=y,
-            population=1
-        )
-        
-        # Update tile to have city center
-        tile = self.map.get_tile(x, y)
-        if tile:
-            tile.district = District.CITY_CENTER
-            tile.owned_by = player_id
-        
-        self.cities[city_id] = city
-        self.players[player_id].cities.append(city_id)
-        
-        # Initial worked tiles (city center only)
-        city.worked_tiles = [(x, y)]
-        
-        return city
-    
-    def get_adjacency_bonus(self, x: int, y: int, district_type: District) -> int:
-        """Calculate adjacency bonus for a district"""
-        adjacent = self.map.get_adjacent_tiles(x, y)
-        bonus = 0
-        
-        if district_type == District.SCIENCE:
-            # Campus: +1 for each adjacent mountain
-            for adj in adjacent:
-                if adj.terrain == Terrain.MOUNTAIN:
-                    bonus += 1
-        elif district_type == District.INDUSTRIAL:
-            # Industrial Zone: +1 for each adjacent mine (hill with resource or forest)
-            for adj in adjacent:
-                if adj.terrain == Terrain.HILL:
-                    bonus += 1
-        
-        return bonus
-    
-    def get_city_production(self, city: City) -> int:
-        """Calculate total production for a city"""
-        base = 2  # City center base production
-        
-        # Add production from worked tiles
-        for x, y in city.worked_tiles:
-            tile = self.map.get_tile(x, y)
-            if tile:
-                base += tile.production_value
-        
-        # Add industrial zone bonuses if present
-        for x, y in city.worked_tiles:
-            tile = self.map.get_tile(x, y)
-            if tile and tile.district == District.INDUSTRIAL:
-                base += self.get_adjacency_bonus(x, y, District.INDUSTRIAL)
-        
-        return base
-    
-    def render(self) -> str:
-        """Render full game state"""
-        output = f"\n=== TURN {self.turn} | PLAYER {self.current_player} ===\n"
-        
-        player = self.players[self.current_player]
-        output += f"Gold: {player.gold} | Faith: {player.faith} | "
-        output += f"Sci: {player.science_flow}/turn | Cul: {player.culture_flow}/turn\n"
-        
-        if player.current_tech:
-            output += f"Tech: {player.current_tech.value} ({player.tech_progress}/100)\n"
-        
-        output += f"\n--- MAP ---\n"
-        output += self.map.render(self.current_player)
-        
-        output += f"\n--- UNITS ---\n"
-        for unit in self.units.values():
-            if unit.player_id == self.current_player:
-                output += f"{unit.unit_type.value} ({unit.x},{unit.y}) HP:{unit.hp} "
-        output += "\n"
-        
-        output += f"\n--- CITIES ---\n"
-        for city_id in player.cities:
-            city = self.cities[city_id]
-            prod = self.get_city_production(city)
-            output += f"{city.id} [Pop {city.population}] [Prod {prod}] Queue: {city.build_queue}\n"
-            output += f" Worked Tiles: {city.worked_tiles}\n"
-        
-        return output
+    def set_diplomatic_state(self, id1: int, id2: int, state: DiplomaticState):
+        self.diplomacy[id1][id2] = state
+        self.diplomacy[id2][id1] = state
+
+    def check_winner(self) -> Optional[int]:
+        active_nations = [n.id for n in self.nations.values() if not n.is_defeated]
+        if len(active_nations) == 1:
+            return active_nations[0]
+        if self.turn >= 200:
+            # Score based on military + gold + production + unlocked trees
+            scores = {}
+            for n in self.nations.values():
+                if n.is_defeated: continue
+                score = n.gold + n.manpower + n.production + (len(n.unlocked_techs)*500) + (len(n.unlocked_civics)*500)
+                scores[n.id] = score
+            if scores:
+                return max(scores, key=scores.get)
+        return None

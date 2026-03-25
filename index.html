@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civilization: Pixel Origins</title>
+    <!-- Pixel Font and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/pixelarticons@1.8.1/css/pixelarticons.min.css">
+    
+    <style>
+        :root {
+            /* Pixel Art Palette */
+            --water: #3b5dc9;
+            --plains: #dca45d;
+            --grass: #5f9231;
+            --hill: #855723;
+            --mountain: #5d6168;
+            
+            --p0-color: #f73939; /* Red */
+            --p1-color: #397ff7; /* Blue */
+            
+            --bg-dark: #121212;
+            --panel-bg: #2a2a2a;
+            --border-glow: #ffffff;
+            --text-main: #f0f0f0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            /* Simple pixel pattern background */
+            background-image: 
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a), 
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        
+        /* Top Turn Bar */
+        #top-bar {
+            height: 60px;
+            background: #1a1a1a;
+            border-bottom: 4px solid #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            z-index: 100;
+        }
+        
+        .player-indicator {
+            padding: 10px 20px;
+            border: 4px solid transparent;
+            opacity: 0.5;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .player-indicator.active {
+            opacity: 1;
+            border-color: white;
+            animation: pulse-border 1.5s infinite;
+        }
+        
+        @keyframes pulse-border {
+            0% { border-color: rgba(255,255,255,1); }
+            50% { border-color: rgba(255,255,255,0.4); }
+            100% { border-color: rgba(255,255,255,1); }
+        }
+
+        .player-0-bar { background-color: rgba(247, 57, 57, 0.2); }
+        .player-1-bar { background-color: rgba(57, 127, 247, 0.2); }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* The map container area */
+        #map-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* Stylized Frame for the map */
+        .map-frame {
+            padding: 8px;
+            background: #444;
+            border: 4px solid #888;
+            border-right-color: #222;
+            border-bottom-color: #222;
+            position: relative;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
+        }
+
+        /* The Grid */
+        #grid {
+            display: grid;
+            gap: 0px; /* No gap for proper borders */
+            background-color: #000;
+        }
+
+        /* Individual Tiles */
+        .tile {
+            width: 48px;
+            height: 48px;
+            position: relative;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            image-rendering: pixelated;
+        }
+        
+        /* Inner hover box to avoid messing with borders */
+        .tile-hover-box {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-sizing: border-box;
+            border: 2px solid transparent;
+        }
+
+        .tile:hover .tile-hover-box {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.2);
+            z-index: 20;
+        }
+
+        .terrain-W { background-color: var(--water); }
+        .terrain-P { background-color: var(--plains); }
+        .terrain-G { background-color: var(--grass); }
+        .terrain-H { background-color: var(--hill); }
+        .terrain-M { 
+            background-color: var(--mountain); 
+            background-image: radial-gradient(#aaa 2px, transparent 2px);
+            background-size: 10px 10px;
+        }
+
+        /* Ownership Borders */
+        .border-top { border-top: 3px solid; }
+        .border-bottom { border-bottom: 3px solid; }
+        .border-left { border-left: 3px solid; }
+        .border-right { border-right: 3px solid; }
+        
+        .border-p0 { border-color: var(--p0-color); }
+        .border-p1 { border-color: var(--p1-color); }
+
+        /* Icons Overlay */
+        .feature-icon, .district-icon, .unit-icon {
+            position: absolute;
+            font-size: 24px;
+            pointer-events: none;
+        }
+
+        .feature-icon {
+            color: rgba(255,255,255,0.7);
+            z-index: 2;
+        }
+
+        .unit-icon {
+            z-index: 5;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        /* Cities */
+        .city-box {
+            position: absolute;
+            inset: 6px;
+            border: 2px solid #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.5);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .city-icon {
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .player-0-color { color: var(--p0-color); }
+        .player-1-color { color: var(--p1-color); }
+        
+        .player-0-bg { background-color: var(--p0-color); }
+        .player-1-bg { background-color: var(--p1-color); }
+
+        /* UI Panel */
+        #ui-panel {
+            width: 400px;
+            background: var(--panel-bg);
+            border-left: 4px solid #555;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 4px solid #111;
+            text-align: center;
+            background: #333;
+        }
+        
+        h1 { margin: 0; font-size: 16px; color: #fff; line-height: 1.4; }
+
+        .panel-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: #111;
+            border: 4px solid #444;
+            padding: 15px;
+            font-size: 10px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+        
+        .stat-title {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .log-container {
+            flex: 1;
+            background: #000;
+            border: 4px solid #444;
+            padding: 12px;
+            font-size: 8px;
+            line-height: 1.5;
+            color: #a3e635;
+            overflow-y: auto;
+        }
+
+        /* Command Input */
+        .command-bar {
+            padding: 20px;
+            background: #222;
+            border-top: 4px solid #111;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            background: #000;
+            border: 4px solid #555;
+            color: white;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 10px;
+            outline: none;
+        }
+        
+        input:focus {
+            border-color: #fff;
+        }
+
+        button {
+            background: #555;
+            color: white;
+            border: 4px solid #888;
+            border-right-color: #222;
+            border-bottom-color: #222;
+            padding: 0 15px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        button:active {
+            border: 4px solid #222;
+            border-right-color: #888;
+            border-bottom-color: #888;
+        }
+        
+        .btn-ai {
+            background: #397ff7;
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <div id="p0-indicator" class="player-indicator player-0-bar">
+            <i class="pi pi-user"></i> Player 0
+        </div>
+        <div id="turn-counter" style="font-size: 20px; color: #ffd700;">
+            Turn 0
+        </div>
+        <div id="p1-indicator" class="player-indicator player-1-bar">
+            <i class="pi pi-user"></i> Player 1
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="map-area">
+            <div class="map-frame">
+                <div id="grid"></div>
+            </div>
+        </div>
+
+        <div id="ui-panel">
+            <div class="panel-header">
+                <h1>COMMAND TERMINAL</h1>
+            </div>
+            
+            <div class="panel-content">
+                <div class="stat-box" id="game-stats">
+                    <div class="stat-title">Game Intel</div>
+                    <div id="turn-info">Loading...</div>
+                </div>
+                
+                <div class="stat-box">
+                    <div class="stat-title">Scanner</div>
+                    <div id="selection-info">Awaiting scan...</div>
+                </div>
+                
+                <div class="log-container" id="log">
+                    <div>> SYS.INIT...</div>
+                    <div>> LINK ESTABLISHED</div>
+                </div>
+            </div>
+
+            <div class="command-bar">
+                <form id="cmd-form" class="input-group">
+                    <input type="text" id="cmd-input" placeholder="CMD..." autocomplete="off">
+                    <button type="submit">EXEC</button>
+                </form>
+                <button class="btn-ai" id="btn-next">NEXT TURN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const turnInfo = document.getElementById('turn-info');
+        const log = document.getElementById('log');
+        const selInfo = document.getElementById('selection-info');
+        const p0Ind = document.getElementById('p0-indicator');
+        const p1Ind = document.getElementById('p1-indicator');
+        const turnCounter = document.getElementById('turn-counter');
+        let gameState = null;
+
+        function logMsg(msg, isError=false) {
+            const div = document.createElement('div');
+            div.textContent = `> ${msg}`;
+            if(isError) div.style.color = '#ff4444';
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function fetchState() {
+            try {
+                // IMPORTANT: Changed to port 8080 due to previous conflict
+                const res = await fetch('http://localhost:8080/api/state');
+                const state = await res.json();
+                gameState = state;
+                renderState(state);
+            } catch (e) {
+                // fall back to relative if on same origin
+                try {
+                    const res = await fetch('/api/state');
+                    const state = await res.json();
+                    gameState = state;
+                    renderState(state);
+                } catch(err) {
+                    // silently fail or log once
+                }
+            }
+        }
+
+        function renderState(state) {
+            // Update Turn Bar
+            turnCounter.textContent = `TURN ${state.turn}`;
+            
+            if(state.current_player === 0) {
+                p0Ind.classList.add('active');
+                p1Ind.classList.remove('active');
+            } else {
+                p1Ind.classList.add('active');
+                p0Ind.classList.remove('active');
+            }
+
+            // Update stats
+            let intel = `P0: Gold ${state.players[0].gold} | Faith ${state.players[0].faith}<br>`;
+            intel += `P1: Gold ${state.players[1].gold} | Faith ${state.players[1].faith}<br>`;
+            if(state.winner !== null) intel += `<br><span style="color:#ffd700">WINNER: P${state.winner}</span>`;
+            turnInfo.innerHTML = intel;
+
+            const map = state.map;
+            grid.style.gridTemplateColumns = `repeat(${map.width}, 48px)`;
+            grid.innerHTML = '';
+
+            // Create matrix for easy lookup
+            const tileMap = new Array(map.height).fill(null).map(() => new Array(map.width).fill(null));
+            map.tiles.forEach(row => {
+                row.forEach(t => {
+                    tileMap[t.y][t.x] = t;
+                });
+            });
+
+            // Map cities and units
+            const cityMap = {};
+            const unitMap = {};
+            
+            Object.values(state.cities).forEach(c => {
+                cityMap[`${c.x},${c.y}`] = c;
+            });
+            Object.values(state.units).forEach(u => {
+                if(!unitMap[`${u.x},${u.y}`]) unitMap[`${u.x},${u.y}`] = [];
+                unitMap[`${u.x},${u.y}`].push(u);
+            });
+
+            // Render grid
+            for(let y=0; y<map.height; y++) {
+                for(let x=0; x<map.width; x++) {
+                    const tileD = tileMap[y][x];
+                    const div = document.createElement('div');
+                    
+                    div.className = `tile terrain-${tileD.terrain}`;
+                    
+                    // Box-sizing border box to let borders eat inwards
+                    div.style.boxSizing = 'border-box';
+
+                    // Check Borders
+                    const owner = tileD.owned_by;
+                    if (owner !== null && owner !== undefined) {
+                        const ownerClass = `border-p${owner}`;
+                        // Top neighbor
+                        if (y > 0 && tileMap[y-1][x].owned_by !== owner) div.classList.add('border-top', ownerClass);
+                        // Bottom neighbor
+                        if (y < map.height - 1 && tileMap[y+1][x].owned_by !== owner) div.classList.add('border-bottom', ownerClass);
+                        // Left neighbor
+                        if (x > 0 && tileMap[y][x-1].owned_by !== owner) div.classList.add('border-left', ownerClass);
+                        // Right neighbor
+                        if (x < map.width - 1 && tileMap[y][x+1].owned_by !== owner) div.classList.add('border-right', ownerClass);
+                    }
+
+                    // Hover box
+                    const hb = document.createElement('div');
+                    hb.className = 'tile-hover-box';
+                    div.appendChild(hb);
+
+                    // Feature Icon
+                    if(tileD.feature === 'F') {
+                        const fi = document.createElement('i');
+                        fi.className = 'pi pi-tree feature-icon';
+                        div.appendChild(fi);
+                    } else if (tileD.feature === 'R') {
+                        const fi = document.createElement('i');
+                        fi.className = 'pi pi-coins feature-icon';
+                        div.appendChild(fi);
+                    }
+
+                    // City
+                    if(cityMap[`${x},${y}`]) {
+                        const c = cityMap[`${x},${y}`];
+                        const cBox = document.createElement('div');
+                        cBox.className = `city-box player-${c.player_id}-bg`;
+                        const ci = document.createElement('i');
+                        ci.className = 'pi pi-building city-icon';
+                        cBox.appendChild(ci);
+                        div.appendChild(cBox);
+                    }
+
+                    // Units
+                    if(unitMap[`${x},${y}`]) {
+                        unitMap[`${x},${y}`].forEach((u, i) => {
+                            const uBox = document.createElement('i');
+                            // Settler = flag, Warrior = sword
+                            const iconClass = u.unit_type === 'W' ? 'pi-sword' : 'pi-flag';
+                            uBox.className = `pi ${iconClass} unit-icon player-${u.player_id}-color`;
+                            if(i > 0) uBox.style.transform = `translate(${i*4}px, ${i*4}px)`;
+                            div.appendChild(uBox);
+                        });
+                    }
+
+                    // Click event
+                    div.onclick = () => {
+                        let info = `LOC: [${x}, ${y}]<br>TERRAIN: ${tileD.terrain}<br>FEATURE: ${tileD.feature}<br>`;
+                        if(owner !== null) info += `OWNER: P${owner}<br>`;
+                        
+                        if(cityMap[`${x},${y}`]) {
+                            const c = cityMap[`${x},${y}`];
+                            info += `<br>[CITY ${c.id}] (P${c.player_id})<br>POP: ${c.population}<br>QUEUE: ${c.build_queue.join(',') || 'EMPTY'}`;
+                        }
+                        if(unitMap[`${x},${y}`]) {
+                            unitMap[`${x},${y}`].forEach(u => {
+                                info += `<br>[UNIT ${u.id}] (${u.unit_type}, P${u.player_id})<br>HP: ${u.hp} | STR: ${u.strength}`;
+                            });
+                        }
+                        selInfo.innerHTML = info;
+                    };
+
+                    grid.appendChild(div);
+                }
+            }
+        }
+
+        async function sendCommand(cmdStr) {
+            try {
+                const res = await fetch('http://localhost:8080/api/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: cmdStr})
+                }).catch(() => fetch('/api/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: cmdStr})
+                }));
+                const data = await res.json();
+                logMsg(data.message, !data.success);
+                fetchState();
+            } catch(e) {
+                logMsg(`Failed to send command`, true);
+            }
+        }
+
+        document.getElementById('cmd-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('cmd-input');
+            const cmd = input.value.trim();
+            if(cmd) {
+                logMsg(`> ${cmd}`);
+                sendCommand(cmd);
+                input.value = '';
+            }
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            logMsg("> ADVANCING TURN");
+            sendCommand(gameState?.current_player !== 0 ? 'STEP_AI' : 'NEXT_TURN');
+        });
+
+        fetchState();
+        setInterval(fetchState, 5000); // Poll
+    </script>
+</body>
+</html>

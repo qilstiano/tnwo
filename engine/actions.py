@@ -14,6 +14,9 @@ class ActionHandler:
         nation = self.state.nations[player_id]
         if nation.is_defeated or len(nation.queued_actions) >= nation.max_action_points:
             return False
+        if nation.queued_actions and nation.is_defeated:
+            nation.queued_actions.clear()
+            return False
             
         parts = command.strip().split()
         cmd = parts[0].upper()
@@ -21,7 +24,7 @@ class ActionHandler:
         # Basic validation
         if cmd == "HARVEST":
             if len(parts) < 2 or parts[1].upper() not in ["GOLD", "MANPOWER", "PRODUCTION", "SCIENCE", "CIVICS"]: return False
-        elif cmd == "DECLARE_WAR" or cmd == "MILITARY_STRIKE" or cmd == "PROPOSE_ALLIANCE" or cmd == "ACCEPT_ALLIANCE":
+        elif cmd in ["DECLARE_WAR", "MILITARY_STRIKE", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", "CANCEL_ALLIANCE", "SABOTAGE", "SKIRMISH", "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH"]:
             if len(parts) < 2: return False
             try: 
                 tid = int(parts[1])
@@ -29,6 +32,26 @@ class ActionHandler:
                     return False
             except ValueError:
                 return False
+                
+        elif cmd in ["PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR"]:
+            if len(parts) < 3: return False
+            try:
+                tid = int(parts[1]) # ally
+                eid = int(parts[2]) # enemy
+                if tid not in self.state.nations or tid == player_id or self.state.nations[tid].is_defeated: return False
+                if eid not in self.state.nations or eid == player_id or self.state.nations[eid].is_defeated: return False
+            except ValueError:
+                return False
+        
+        elif cmd == "INVEST":
+            # INVEST <resource> -- must have 200 gold
+            if len(parts) < 2 or parts[1].upper() not in ["MANPOWER", "INDUSTRY", "SCIENCE", "CIVICS", "MILITARY"]: return False
+            if self.state.nations[player_id].gold < 200: return False
+                
+        # 25-Turn Grace Period: Block external operations
+        foreign_cmds = ["DECLARE_WAR", "MILITARY_STRIKE", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", "CANCEL_ALLIANCE", "SABOTAGE", "SKIRMISH", "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH", "PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR"]
+        if self.state.turn <= 25 and cmd in foreign_cmds:
+            return False
 
         nation.queued_actions.append(command.strip())
         nation.action_points -= 1
@@ -54,7 +77,12 @@ class ActionHandler:
                 ("🌍 ECONOMIC BOOM: Trade routes flourish! +100 Gold.", lambda n: setattr(n, 'gold', n.gold + 100)),
                 ("🌍 SCIENTIFIC BREAKTHROUGH: +50 Science.", lambda n: setattr(n, 'science', n.science + 50)),
                 ("🌍 NATURAL DISASTER: Infrastructure damaged across the continent.", lambda n: setattr(n, 'infrastructure_health', max(10, n.infrastructure_health - 15))),
-                ("🌍 RENAISSANCE: +50 Civics.", lambda n: setattr(n, 'civics', n.civics + 50))
+                ("🌍 RENAISSANCE: +50 Civics.", lambda n: setattr(n, 'civics', n.civics + 50)),
+                ("🌍 MARKET CRASH: Global recession drains treasuries by 50 Gold.", lambda n: setattr(n, 'gold', max(0, n.gold - 50))),
+                ("🌍 IDEOLOGICAL SHIFT: Widespread protests harm production.", lambda n: setattr(n, 'production', max(0, n.production - 30))),
+                ("🌍 GOLDEN HARVEST: Bountiful yields grant +50 Manpower.", lambda n: setattr(n, 'manpower', n.manpower + 50)),
+                ("🌍 CYBER WARFARE PANIC: Random intellectual property theft reduces Science.", lambda n: setattr(n, 'science', max(0, n.science - 20))),
+                ("🌍 ARMS RACE: Military industry subsidies grant +50 Production.", lambda n: setattr(n, 'production', n.production + 50))
             ]
             chosen_event = random.choice(events)
             self.turn_events.append(chosen_event[0])
@@ -66,8 +94,10 @@ class ActionHandler:
         alliance_proposals = []
         trade_proposals = []
         research_proposals = []
+        joint_war_proposals = []
         
         for n in self.state.nations.values():
+            if n.is_defeated: continue
             for cmd in n.queued_actions:
                 if cmd.startswith("PROPOSE_ALLIANCE"):
                     target = int(cmd.split()[1])
@@ -81,8 +111,15 @@ class ActionHandler:
                     target = int(cmd.split()[1])
                     research_proposals.append((n.id, target))
                     self.turn_events.append(f"{n.name} proposed a Research Pact to {self.state.nations[target].name}.")
+                elif cmd.startswith("PROPOSE_JOINT_WAR"):
+                    parts = cmd.split()
+                    target = int(parts[1])
+                    enemy = int(parts[2])
+                    joint_war_proposals.append((n.id, target, enemy))
+                    self.turn_events.append(f"{n.name} requested {self.state.nations[target].name} to join them in a war against {self.state.nations[enemy].name}!")
                     
         for n in self.state.nations.values():
+            if n.is_defeated: continue
             for cmd in n.queued_actions:
                 if cmd.startswith("ACCEPT_ALLIANCE"):
                     target = int(cmd.split()[1])
@@ -90,7 +127,9 @@ class ActionHandler:
                         self.state.set_diplomatic_state(n.id, target, DiplomaticState.ALLIED)
                         n.achievements.alliances_formed += 1
                         self.state.nations[target].achievements.alliances_formed += 1
-                        self.turn_events.append(f"{n.name} and {self.state.nations[target].name} formed an Alliance!")
+                        n.manpower += 150
+                        self.state.nations[target].manpower += 150
+                        self.turn_events.append(f"{n.name} and {self.state.nations[target].name} formed an Alliance! (+150🪖 mobilization)")
                 
                 elif cmd.startswith("ACCEPT_TRADE"):
                     target = int(cmd.split()[1])
@@ -100,7 +139,9 @@ class ActionHandler:
                             self.state.nations[target].active_trade_agreements.append(n.id)
                             # Remove from pending if applicable
                             if target in n.pending_trade_agreements: n.pending_trade_agreements.remove(target)
-                            self.turn_events.append(f"{n.name} and {self.state.nations[target].name} signed a Trade Agreement (+15% Gold)!")
+                            n.gold += 200
+                            self.state.nations[target].gold += 200
+                            self.turn_events.append(f"{n.name} and {self.state.nations[target].name} signed a Trade Agreement (+200💰 / +15% / t)!")
                 
                 elif cmd.startswith("ACCEPT_RESEARCH"):
                     target = int(cmd.split()[1])
@@ -110,7 +151,29 @@ class ActionHandler:
                             self.state.nations[target].active_research_pacts.append(n.id)
                             # Remove from pending if applicable
                             if target in n.pending_research_pacts: n.pending_research_pacts.remove(target)
-                            self.turn_events.append(f"{n.name} and {self.state.nations[target].name} signed a Research Pact (+15% Science)!")
+                            n.science += 150
+                            self.state.nations[target].science += 150
+                            self.turn_events.append(f"{n.name} and {self.state.nations[target].name} signed a Research Pact (+150🔬 / +15% / t)!")
+                
+                elif cmd.startswith("ACCEPT_JOINT_WAR"):
+                    parts = cmd.split()
+                    proposer = int(parts[1])
+                    enemy = int(parts[2])
+                    
+                    valid = False
+                    if (proposer, n.id, enemy) in joint_war_proposals:
+                         valid = True
+                    else:
+                         for p in n.pending_joint_wars:
+                              if p["proposer"] == proposer and p["enemy"] == enemy:
+                                  valid = True
+                                  n.pending_joint_wars.remove(p)
+                                  break
+                    
+                    if valid:
+                         self.state.set_diplomatic_state(n.id, enemy, DiplomaticState.WAR)
+                         self.state.set_diplomatic_state(proposer, enemy, DiplomaticState.WAR)
+                         self.turn_events.append(f"JOINT WAR: {n.name} answered {self.state.nations[proposer].name}'s call and declared war on {self.state.nations[enemy].name}!")
                             
         # Store unmet proposals as pending
         for proposer, target in alliance_proposals:
@@ -126,9 +189,16 @@ class ActionHandler:
             if target not in self.state.nations[proposer].active_research_pacts:
                 if proposer not in self.state.nations[target].pending_research_pacts:
                     self.state.nations[target].pending_research_pacts.append(proposer)
+                    
+        for proposer, target, enemy in joint_war_proposals:
+            if self.state.get_diplomatic_state(target, enemy) != DiplomaticState.WAR:
+                already_pending = any(p["proposer"] == proposer and p["enemy"] == enemy for p in self.state.nations[target].pending_joint_wars)
+                if not already_pending:
+                    self.state.nations[target].pending_joint_wars.append({"proposer": proposer, "enemy": enemy})
         
         # 2. Economy & Development (Harvest, Research, Civic)
         for n in self.state.nations.values():
+            if n.is_defeated: continue
             for cmd in n.queued_actions:
                 parts = cmd.split()
                 if parts[0] == "HARVEST":
@@ -171,6 +241,31 @@ class ActionHandler:
 
                     self.turn_events.append(f"{n.name} harvested {res}.")
 
+                elif parts[0] == "INVEST":
+                    target_res = parts[1].upper()
+                    cost = 200
+                    n.gold -= cost
+                    if target_res == "MANPOWER":
+                        n.manpower_yield += 5
+                        n.manpower += 100
+                        self.turn_events.append(f"{n.name} invested in population growth (+5🪖/t, +100🪖 now).")
+                    elif target_res == "INDUSTRY":
+                        n.production_yield += 3
+                        n.production += 75
+                        self.turn_events.append(f"{n.name} built new factories (+3🏭/t, +75🏭 now).")
+                    elif target_res == "SCIENCE":
+                        n.science_yield += 3
+                        n.science += 75
+                        self.turn_events.append(f"{n.name} funded academies (+3🔬/t, +75🔬 now).")
+                    elif target_res == "CIVICS":
+                        n.civic_yield += 3
+                        n.civics += 50
+                        self.turn_events.append(f"{n.name} reformed its institutions (+3🏛️/t, +50🏛️ now).")
+                    elif target_res == "MILITARY":
+                        n.military += 150
+                        n.manpower += 50
+                        self.turn_events.append(f"{n.name} expanded its standing army (+150⚔️, +50🪖).")
+
                 elif parts[0] == "RESEARCH":
                     tech = " ".join(parts[1:])
                     n.current_tech = tech
@@ -183,6 +278,7 @@ class ActionHandler:
 
         # 3. War Declarations
         for n in self.state.nations.values():
+            if n.is_defeated: continue
             for cmd in n.queued_actions:
                 if cmd.startswith("DECLARE_WAR"):
                     target = int(cmd.split()[1])
@@ -195,11 +291,65 @@ class ActionHandler:
                             if oid != n.id and oid != target and not onat.is_defeated:
                                 onat.grievances[n.id] = onat.grievances.get(n.id, 0) + 50
 
+        # 3.5 Covert Ops and Skirmishes
+        for n in self.state.nations.values():
+            if n.is_defeated: continue
+            for cmd in n.queued_actions:
+                if cmd.startswith("CANCEL_ALLIANCE"):
+                    target = int(cmd.split()[1])
+                    if self.state.get_diplomatic_state(n.id, target) == DiplomaticState.ALLIED:
+                        self.state.set_diplomatic_state(n.id, target, DiplomaticState.NEUTRAL)
+                        self.state.nations[target].grievances[n.id] = self.state.nations[target].grievances.get(n.id, 0) + 150
+                        self.turn_events.append(f"BETRAYAL: {n.name} broke their Alliance with {self.state.nations[target].name}!")
+
+                elif cmd.startswith("SABOTAGE"):
+                    target = int(cmd.split()[1])
+                    cost_gold = 50
+                    is_ally = self.state.get_diplomatic_state(n.id, target) == DiplomaticState.ALLIED
+                    if n.gold >= cost_gold:
+                        n.gold -= cost_gold
+                        t_nat = self.state.nations[target]
+                        stolen_sci = min(t_nat.science, 30)
+                        t_nat.science -= stolen_sci
+                        n.science += stolen_sci
+                        t_nat.production = max(0, t_nat.production - 50)
+                        t_nat.infrastructure_health = max(0, t_nat.infrastructure_health - 5)
+                        # Allied betrayal: massively inflated penalties
+                        if is_ally:
+                            t_nat.grievances[n.id] = t_nat.grievances.get(n.id, 0) + 150
+                            n.grievances[target] = n.grievances.get(target, 0) + 50  # reputation cost
+                            self.turn_events.append(f"BETRAYAL: {n.name} sabotaged their ally {t_nat.name}! (+150 grievances)")
+                        else:
+                            t_nat.grievances[n.id] = t_nat.grievances.get(n.id, 0) + 25
+                            self.turn_events.append(f"SHADOW WAR: {n.name} sabotaged {t_nat.name}'s industry and stole {stolen_sci}🔬!")
+                            
+                elif cmd.startswith("SKIRMISH"):
+                    target = int(cmd.split()[1])
+                    cost_mp = 20
+                    is_ally = self.state.get_diplomatic_state(n.id, target) == DiplomaticState.ALLIED
+                    if n.manpower >= cost_mp:
+                        n.manpower -= cost_mp
+                        t_nat = self.state.nations[target]
+                        t_nat.manpower = max(0, t_nat.manpower - 40)
+                        stolen_gold = min(t_nat.gold, 50)
+                        t_nat.gold -= stolen_gold
+                        n.gold += stolen_gold
+                        t_nat.infrastructure_health = max(0, t_nat.infrastructure_health - 5)
+                        # Allied betrayal: massively inflated penalties
+                        if is_ally:
+                            t_nat.grievances[n.id] = t_nat.grievances.get(n.id, 0) + 200
+                            n.grievances[target] = n.grievances.get(target, 0) + 75  # own rep hurt too
+                            self.turn_events.append(f"BETRAYAL: {n.name} raided their ally {t_nat.name}'s border! (+200 grievances)")
+                        else:
+                            t_nat.grievances[n.id] = t_nat.grievances.get(n.id, 0) + 40
+                            self.turn_events.append(f"BORDER CONFLICT: {n.name}'s forces skirmished with {t_nat.name}! Looted {stolen_gold}💰.")
+
         # 4. Military Strikes (Simultaneous Damage)
         # Calculate all damage first so nations don't die mid-resolution preventing their own strikes
         damages = {} # target_id -> list of (attacker_name, manpower_dmg, infra_dmg)
         
         for n in self.state.nations.values():
+            if n.is_defeated: continue
             strike_count = sum(1 for c in n.queued_actions if c.startswith("MILITARY_STRIKE"))
             if strike_count == 0: continue
             
@@ -272,7 +422,35 @@ class ActionHandler:
                 
                 self.turn_events.append(f"*** {target.name} HAS FALLEN! {killer.name} annexed their territory (+{abs_g}💰/t, +{abs_p}🏭/t) ***")
 
-        # 5. Clean up and Next Turn
+        # 6. Alliance and Treaty Breakage from Grievances
+        for n in self.state.nations.values():
+            if n.is_defeated: continue
+            for target_id, target in self.state.nations.items():
+                if target.is_defeated or n.id == target_id: continue
+                
+                grievances = target.grievances.get(n.id, 0)
+                if grievances >= 50 and self.state.get_diplomatic_state(n.id, target_id) == DiplomaticState.ALLIED:
+                    self.state.set_diplomatic_state(n.id, target_id, DiplomaticState.NEUTRAL)
+                    if target_id in n.active_trade_agreements:
+                        n.active_trade_agreements.remove(target_id)
+                    if n.id in target.active_trade_agreements:
+                        target.active_trade_agreements.remove(n.id)
+                    if target_id in n.active_research_pacts:
+                        n.active_research_pacts.remove(target_id)
+                    if n.id in target.active_research_pacts:
+                        target.active_research_pacts.remove(n.id)
+                        
+                    self.turn_events.append(f"ALLIANCE SHATTERED: {n.name}'s hostility has exhausted {target.name}'s patience!")
+
+        # 6.5 Failed State Collapse Check
+        for n in self.state.nations.values():
+            if not n.is_defeated and n.infrastructure_health <= 0:
+                n.is_defeated = True
+                n.infrastructure_health = 0
+                n.manpower = 0
+                self.turn_events.append(f"*** {n.name} HAS COLLAPSED! Continual devastation has fractured the nation. ***")
+
+        # 7. Clean up and Next Turn
         self.state.turn += 1
         self.state.process_turn_updates()
         

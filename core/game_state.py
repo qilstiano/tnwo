@@ -15,8 +15,15 @@ class GameState:
         self.diplomacy: Dict[int, Dict[int, DiplomaticState]] = {}
         
         # Generate some flavor names
-        NATION_NAMES = ["Valnor", "Zephyria", "Ironforge", "Aeldria", "Crimson Order", "Sunpeak", "Mercia"]
-        PERSONALITIES = ["WARMONGER", "SCIENTIST", "MERCHANT", "DIPLOMAT", "BALANCED"]
+        NATION_NAMES = [
+            "Dahum", "Maurania", "Darrar", "West Monrassa", "Gabelia", "Esana", "Seabra", "Sirajiya",
+            "Takistan", "Tazbekistan", "Tyranistan", "Turmezistan", "Adjikistan", "Albenistan", "Pagaan", "Yinke",
+            "Litzenburg", "Frobnia", "Livonia", "Corland", "Ostrel", "Westmark", "Vardos", "Norvane",
+            "Chimerica", "El Honduragua", "San Theodoros", "Eastmere", "Northgate", "Bellview", "Carrick", "Glenmore",
+            "Nova Holanda", "Floriano", "Gran Solaris", "Patagonia", "Pernambuco", "Elsa Nuja", "Roskahrk", "Sabbiamodo",
+            "Naurava", "Koramea", "Tavea", "Maru Island", "Vareka", "South Pelora", "East Tanoa", "Kalume"
+        ]
+        PERSONALITIES = ["WARMONGER", "BALANCED", "TECHNOCRAT", "OPPORTUNIST"]
         
         for i in range(num_players):
             name = NATION_NAMES[i % len(NATION_NAMES)]
@@ -77,7 +84,8 @@ class GameState:
             nation.gold += int((nation.gold_yield + nation.absorbed_gold_yield) * gold_mod)
             nation.manpower += int(nation.manpower_yield * manpower_mod)
             nation.production += int((nation.production_yield + nation.absorbed_prod_yield) * prod_mod)
-            nation.science += nation.absorbed_sci_yield
+            nation.science += int((nation.science_yield + nation.absorbed_sci_yield) * sci_mod)
+            nation.civics += int(nation.civic_yield)
             
             # Check tech/civic passives
             if getattr(nation.achievements, 'industrial_revolution', False):
@@ -85,27 +93,29 @@ class GameState:
             if getattr(nation.achievements, 'enlightenment', False):
                 nation.science += nation.manpower // 10
                 
-            # Process Tech
+            # Process Tech Native Currency Exchange
             if nation.current_tech:
-                nation.tech_progress += nation.science_yield + nation.science
-                nation.science = 0 # consume lump science
                 cost = self.get_tech_cost(nation.current_tech)
-                if nation.tech_progress >= cost:
+                if nation.science >= cost:
+                    nation.science -= cost
                     nation.unlocked_techs.append(nation.current_tech)
                     nation.current_tech = None
                     nation.tech_progress = 0
                     nation.achievements.techs_researched += 1
+                else:
+                    nation.tech_progress = nation.science # Map visualizer for legacy support
                     
-            # Process Civic
+            # Process Civic Native Currency Exchange
             if nation.current_civic:
-                nation.civic_progress += nation.civic_yield + nation.civics
-                nation.civics = 0
                 cost = self.get_civic_cost(nation.current_civic)
-                if nation.civic_progress >= cost:
+                if nation.civics >= cost:
+                    nation.civics -= cost
                     nation.unlocked_civics.append(nation.current_civic)
                     nation.current_civic = None
                     nation.civic_progress = 0
                     nation.achievements.civic_policies_adopted += 1
+                else:
+                    nation.civic_progress = nation.civics # Map visualizer for legacy support
             
             # Check constant achievements
             if nation.gold > 1000:
@@ -156,12 +166,40 @@ class GameState:
         self.diplomacy[id1][id2] = state
         self.diplomacy[id2][id1] = state
 
-    def check_winner(self) -> Optional[int]:
+    def check_winner(self):
+        """Returns:
+        - int: single winner ID for domination or score victory
+        - list[int]: multiple winner IDs for peace victory
+        - None: game still ongoing
+        """
         active_nations = [n.id for n in self.nations.values() if not n.is_defeated]
+        
+        # Domination victory: only one nation survives
         if len(active_nations) == 1:
             return active_nations[0]
-        if self.turn >= 200:
-            # Score based on military + gold + production + unlocked trees
+        
+        # No nations left (edge case)
+        if len(active_nations) == 0:
+            return None
+
+        if self.turn >= 100:
+            # Check for Peace Victory: if all surviving nations are allied with each other
+            all_allied = True
+            for i in range(len(active_nations)):
+                for j in range(i + 1, len(active_nations)):
+                    status = self.get_diplomatic_state(active_nations[i], active_nations[j])
+                    from .constants import DiplomaticState
+                    if status != DiplomaticState.ALLIED:
+                        all_allied = False
+                        break
+                if not all_allied:
+                    break
+            
+            if all_allied and len(active_nations) > 1:
+                # Peace Victory — all survivors share the win
+                return active_nations
+            
+            # Score Victory: highest combined stat score
             scores = {}
             for n in self.nations.values():
                 if n.is_defeated: continue
@@ -169,6 +207,7 @@ class GameState:
                 scores[n.id] = score
             if scores:
                 return max(scores, key=scores.get)
+        
         return None
 
     def get_symbolic_state(self, player_id: int) -> dict:
@@ -231,6 +270,8 @@ class GameState:
                 "active_research_pacts": my_nation.active_research_pacts,
                 "pending_trade_agreements": my_nation.pending_trade_agreements,
                 "pending_research_pacts": my_nation.pending_research_pacts,
+                "pending_joint_wars": my_nation.pending_joint_wars,
+                "pending_peace_treaties": my_nation.pending_peace_treaties,
                 "grievances": my_nation.grievances
             }
         }
@@ -250,7 +291,8 @@ class GameState:
                 "diplomatic_status": diplomatic_status,
                 "visible_status": {
                     "infrastructure_health": n.infrastructure_health,
-                    "estimated_tech_tier": tier
+                    "estimated_tech_tier": tier,
+                    "global_grievances": sum(onat.grievances.get(n.id, 0) for onat in self.nations.values() if not onat.is_defeated)
                 }
             })
 

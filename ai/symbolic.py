@@ -4,17 +4,23 @@ import json
 
 class GameAction(BaseModel):
     action: Literal[
-        "HARVEST", "DECLARE_WAR", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", 
+        "HARVEST", "DECLARE_WAR", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", "CANCEL_ALLIANCE",
         "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH", 
-        "MILITARY_STRIKE", "RESEARCH", "PURSUE_CIVIC"
+        "MILITARY_STRIKE", "SABOTAGE", "SKIRMISH", "RESEARCH", "PURSUE_CIVIC",
+        "PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR", "INVEST",
+        "PROPOSE_PEACE", "ACCEPT_PEACE"
     ] = Field(..., description="The command to execute.")
     target: Optional[Union[int, str]] = Field(
         None, 
         description="""The target of the action. 
         For HARVEST: 'GOLD', 'MANPOWER', 'PRODUCTION', 'SCIENCE', 'CIVICS'.
-        For DECLARE_WAR, PROPOSE_*, ACCEPT_*, MILITARY_STRIKE: int (Target Nation ID).
+        For DECLARE_WAR, PROPOSE_*, ACCEPT_*, CANCEL_*, MILITARY_STRIKE, SABOTAGE, SKIRMISH: int (Target Nation ID).
         For RESEARCH: str (Tech Name).
         For PURSUE_CIVIC: str (Civic Name)."""
+    )
+    enemy: Optional[int] = Field(
+        None,
+        description="The secondary target strictly representing the enemy Nation ID when proposing or accepting a joint war."
     )
     
     @field_validator('target')
@@ -36,14 +42,15 @@ class GameAction(BaseModel):
             if val not in ["GOLD", "MANPOWER", "PRODUCTION", "SCIENCE", "CIVICS"]:
                 raise ValueError(f"Invalid harvest target: {v}")
             return val
-        elif action in ["DECLARE_WAR", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", 
+        elif action in ["DECLARE_WAR", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", "CANCEL_ALLIANCE",
                         "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", 
-                        "ACCEPT_RESEARCH", "MILITARY_STRIKE"]:
+                        "ACCEPT_RESEARCH", "MILITARY_STRIKE", "SABOTAGE", "SKIRMISH",
+                        "PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR", "PROPOSE_PEACE", "ACCEPT_PEACE"]:
             try:
                 return int(v)
             except (ValueError, TypeError):
                 raise ValueError(f"Action {action} requires an integer Nation ID, got: {v}")
-        elif action in ["RESEARCH", "PURSUE_CIVIC"]:
+        elif action in ["RESEARCH", "PURSUE_CIVIC", "INVEST"]:
             if not isinstance(v, str) or not v.strip():
                 raise ValueError(f"Action {action} requires a string target, got: {v}")
             return str(v)
@@ -51,7 +58,9 @@ class GameAction(BaseModel):
         return v
         
     def to_engine_string(self) -> str:
-        if self.target is not None:
+        if self.action in ["PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR"]:
+             return f"{self.action} {self.target} {self.enemy}"
+        elif self.target is not None:
             return f"{self.action} {self.target}"
         return self.action
 

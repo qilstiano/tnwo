@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Disco Origin - Strategy Simulator</title>
+    <title>twno-frontend</title>
     <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Serif:wght@400;700&display=swap"
         rel="stylesheet">
     <style>
@@ -50,7 +50,8 @@
             color: #ccc;
         }
 
-        .nav-settings select, .nav-settings input {
+        .nav-settings select,
+        .nav-settings input {
             background: #222;
             color: #fff;
             border: 1px solid #d85c36;
@@ -80,6 +81,7 @@
             border-color: #6bb093;
             color: #6bb093;
         }
+
         .export-btn:hover {
             background: #6bb093;
             color: #000;
@@ -117,8 +119,8 @@
 
         #party-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
+            gap: 10px;
             align-content: flex-start;
             overflow-y: auto;
             max-height: 50%;
@@ -148,6 +150,24 @@
             opacity: 0.5;
         }
 
+        .failed-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            color: #ff3333;
+            border: 3px solid #ff3333;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.85);
+            white-space: nowrap;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 50, 50, 0.5);
+        }
+
         .portrait {
             width: 100%;
             height: 100%;
@@ -161,8 +181,8 @@
             right: 0;
             background: rgba(0, 0, 0, 0.85);
             font-family: 'PT Sans', sans-serif;
-            font-size: 11px;
-            padding: 4px;
+            font-size: 10px;
+            padding: 3px;
             text-align: center;
             border-top: 1px solid #d85c36;
         }
@@ -172,9 +192,8 @@
             top: 0;
             left: 0;
             right: 0;
-            background: #d85c36;
             color: white;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
             padding: 3px;
             text-align: center;
@@ -185,8 +204,8 @@
         /* Diplo Tracker Box */
         #diplo-tab {
             flex: 1;
-            background: rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.05);
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             padding: 10px;
             overflow-y: auto;
             font-family: 'PT Sans', sans-serif;
@@ -195,7 +214,7 @@
         .diplo-block {
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px dotted rgba(255,255,255,0.1);
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
         }
 
         .diplo-nation {
@@ -211,8 +230,13 @@
             margin-left: 10px;
         }
 
-        .rel-war { color: #ff5555; }
-        .rel-pact { color: #6bb093; }
+        .rel-war {
+            color: #ff5555;
+        }
+
+        .rel-pact {
+            color: #6bb093;
+        }
 
         /* MIDDLE PANEL: Ledger (World State) */
         .middle-panel {
@@ -394,16 +418,7 @@
         }
 
         .option-btn::before {
-            color: inherit;
-            font-weight: bold;
-        }
-
-        #btn-next::before {
-            content: "1. - ";
-        }
-
-        #btn-auto::before {
-            content: "2. - ";
+            display: none;
         }
     </style>
 </head>
@@ -411,8 +426,16 @@
 <body>
 
     <div class="top-nav">
-        <div class="nav-title">The Simulacrum Interface</div>
+        <div class="nav-title" style="display:flex; align-items:center;">
+            The Simulacrum
+            <div style="margin-left: 20px; color: #6bb093; font-size: 14px; letter-spacing: 1px;">
+                EPOCH: <span id="top-turn-counter" style="color: #fff;">1</span>
+            </div>
+        </div>
         <div class="nav-settings">
+            <button class="option-btn"
+                style="color:#6bb093; text-align:center; flex:0; white-space:nowrap; padding: 10px 20px; border: 1px solid #6bb093; border-radius: 5px; font-size: 14px;"
+                id="btn-auto"><strong>▶ START AUTOPLAY</strong></button>
             <label>Mode:</label>
             <select id="sim-mode">
                 <option value="EvE">CPU vs CPU</option>
@@ -462,11 +485,6 @@
                     <div class="line-text" style="color:#d88636;">The geopolitical cogs are in place.
                         War and pacts await. </div>
                 </div>
-            </div>
-
-            <div id="dialogue-options">
-                <button class="option-btn" id="btn-next">Skip your turn.</button>
-                <button class="option-btn" style="color:#6bb093;" id="btn-auto"><strong>▶ START AUTOPLAY</strong></button>
             </div>
         </div>
 
@@ -531,18 +549,37 @@
 
         function renderUI(state) {
             ledgerTurn.textContent = "World State (Epoch " + state.turn + ")";
+            const topCounter = document.getElementById('top-turn-counter');
+            if (topCounter) topCounter.textContent = state.turn;
+
             const nations = Object.values(state.nations).sort((a, b) => a.id - b.id);
+
+            const archIcons = {
+                "WARMONGER": "⚔️",
+                "TECHNOCRAT": "🔬",
+                "BALANCED": "⚖️",
+                "OPPORTUNIST": "🐍"
+            };
+            const archColors = {
+                "WARMONGER": "#931718",
+                "TECHNOCRAT": "#06b6d4",
+                "BALANCED": "#6bb093",
+                "OPPORTUNIST": "#8b5cf6"
+            };
 
             // 1. Render Portraits
             let partyHtml = '';
             nations.forEach(n => {
                 const img = assignPortrait(n.id);
+                const color = archColors[n.personality] || n.color;
+                const icon = archIcons[n.personality] || "🏳️";
                 partyHtml += `
-            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}">
-                <div class="nation-title">${n.name}</div>
+            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}" style="border-color:${color};">
+                <div class="nation-title" style="background:${color}; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${icon} ${n.name} <div style="font-size:7px; opacity:0.8; font-weight:normal;">(${n.personality})</div></div>
                 <img class="portrait" src="${img}" alt="${n.name}">
+                ${n.is_defeated ? '<div class="failed-stamp">FAILED STATE</div>' : ''}
                 <div class="portrait-stats">
-                    ⚔️${n.military}  💰${n.gold}
+                    ⚔️${n.military}  💰${n.gold} <br>🏗️ ${n.infrastructure_health}%
                 </div>
             </div>`;
             });
@@ -553,7 +590,12 @@
             let diploHtml = '';
 
             if (state.winner !== null) {
-                ledgerHtml += `<div class="ledger-item" style="color:#ecc987;font-size:18px; grid-column: 1 / -1; text-align: center;">👑 NATION ${state.winner} HAS TRIUMPHED 👑</div>`;
+                const winnerLabel = state.victory_type === 'PEACE'
+                    ? `☮️ PEACE VICTORY — ${state.winner_name}`
+                    : state.victory_type === 'DOMINATION'
+                        ? `👑 DOMINATION — ${state.winner_name} conquers all`
+                        : `🏆 SCORE VICTORY — ${state.winner_name} prevails`;
+                ledgerHtml += `<div class="ledger-item" style="color:#ecc987;font-size:18px; grid-column: 1 / -1; text-align: center;">${winnerLabel}</div>`;
             }
 
             nations.forEach(n => {
@@ -573,31 +615,43 @@
                     }
                 });
 
+                // Determine what the world thinks of n.
+                let globalGrievances = 0;
+                nations.forEach(other_n => {
+                    if (other_n.id !== n.id && other_n.grievances && other_n.grievances[n.id]) {
+                        globalGrievances += other_n.grievances[n.id];
+                    }
+                });
+
                 // Build Diplomacy entry for the Left Tab
+                const color = n.is_defeated ? "#555" : (archColors[n.personality] || n.color);
+                const icon = archIcons[n.personality] || "🏳️";
+
                 if (!n.is_defeated) {
                     diploHtml += `<div class="diplo-block">
-                        <div class="diplo-nation">${n.name}</div>
-                        ${wars.length > 0 ? `<div class="diplo-rel rel-war">Wars: ${wars.join(', ')}</div>` : ''}
-                        ${pacts.length > 0 ? `<div class="diplo-rel rel-pact">Allies: ${pacts.join(', ')}</div>` : ''}
-                        ${(wars.length === 0 && pacts.length === 0) ? `<div class="diplo-rel" style="color:#777;">Isolationist</div>` : ''}
+                        <div class="diplo-nation" style="color:${color}">${icon} ${n.name}</div>
+                        ${wars.length > 0 ? `<div class="diplo-rel rel-war">⚔️ Wars: ${wars.join(', ')}</div>` : ''}
+                        ${pacts.length > 0 ? `<div class="diplo-rel rel-pact">🤝 Allies: ${pacts.join(', ')}</div>` : ''}
+                        ${globalGrievances > 0 ? `<div class="diplo-rel" style="color:${globalGrievances >= 100 ? '#ff5555; font-weight:bold;' : '#d85c36;'}">🔥 Global Tensions: ${globalGrievances}${globalGrievances >= 100 ? ' (PARIAH)' : ''}</div>` : ''}
+                        ${(wars.length === 0 && pacts.length === 0 && globalGrievances === 0) ? `<div class="diplo-rel" style="color:#777;">Isolationist</div>` : ''}
                     </div>`;
                 }
 
                 // Build Ledger entry for the Central Area
                 if (n.is_defeated) {
-                    ledgerHtml += `<div class="ledger-item" style="opacity:0.4;">
+                    ledgerHtml += `<div class="ledger-item" style="opacity:0.4; border-left: 5px solid #222;">
                     <span class="ledger-name"><del>${n.name}</del></span> <span style="color:#d85c36">[Fallen]</span>
                 </div>`;
                 } else {
                     ledgerHtml += `
-                <div class="ledger-item">
-                    <span class="ledger-name">${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality})</span>
+                <div class="ledger-item" style="border-left: 5px solid ${color};">
+                    <span class="ledger-name" style="color:${color}">${icon} ${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality})</span>
                     <div style="margin-top:10px;">
-                        <div class="ledger-row"><span>Wealth</span><span>${n.gold} <span style="color:#6bb093;font-size:12px;">(+${n.gold_yield + n.absorbed_gold_yield})</span></span></div>
-                        <div class="ledger-row"><span>Manpower</span><span>${n.manpower} <span style="color:#6bb093;font-size:12px;">(+${n.manpower_yield})</span></span></div>
-                        <div class="ledger-row"><span>Industry</span><span>${n.production} <span style="color:#6bb093;font-size:12px;">(+${n.production_yield + n.absorbed_prod_yield})</span></span></div>
-                        <div class="ledger-row"><span>Science</span><span>${n.science} <span style="color:#6bb093;font-size:12px;">(+${n.science_yield + n.absorbed_sci_yield})</span></span></div>
-                        <div class="ledger-row"><span>Civics</span><span>${n.civics} <span style="color:#6bb093;font-size:12px;">(+${n.civic_yield})</span></span></div>
+                        <div class="ledger-row"><span>💰 Wealth</span><span>${n.gold} <span style="color:#6bb093;font-size:12px;">(+${n.gold_yield + n.absorbed_gold_yield})</span></span></div>
+                        <div class="ledger-row"><span>🪖 Manpower</span><span>${n.manpower} <span style="color:#6bb093;font-size:12px;">(+${n.manpower_yield})</span></span></div>
+                        <div class="ledger-row"><span>🏭 Industry</span><span>${n.production} <span style="color:#6bb093;font-size:12px;">(+${n.production_yield + n.absorbed_prod_yield})</span></span></div>
+                        <div class="ledger-row"><span>🔬 Science</span><span>${n.science} <span style="color:#6bb093;font-size:12px;">(+${n.science_yield + n.absorbed_sci_yield})</span></span></div>
+                        <div class="ledger-row"><span>🏛️ Civics</span><span>${n.civics} <span style="color:#6bb093;font-size:12px;">(+${n.civic_yield})</span></span></div>
                     </div>
                 </div>`;
                 }
@@ -625,19 +679,38 @@
                 const data = await res.json();
 
                 if (data.logs && data.logs.length > 0) {
-                    pushLog('TIME', `EPOCH ${data.turn - 1} HAS PASSED`, 'global');
-                    data.logs.forEach(msg => {
-                        pushLog('WORLD', msg);
-                    });
+                    // Filter logs that mention defeated nations' turns starting
+                    const filteredLogs = data.logs.filter(msg => !msg.startsWith('--- RESOLVING'));
+                    if (filteredLogs.length > 0) {
+                        pushLog('TIME', `EPOCH ${data.turn - 1} HAS PASSED`, 'global');
+                        filteredLogs.forEach(msg => {
+                            pushLog('WORLD', msg);
+                        });
+                    }
                 }
-                fetchState();
+
+                // Fetch updated state and check if game over
+                const stateRes = await fetch('/api/state').catch(() => fetch('http://localhost:8080/api/state'));
+                const stateData = await stateRes.json();
+                renderUI(stateData);
+
+                // Stop autoplay if someone has won
+                if (stateData.winner !== null && isAutoplaying) {
+                    isAutoplaying = false;
+                    clearInterval(autoInterval);
+                    btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                    btnAuto.style.color = '#6bb093';
+                    const victoryMsg = stateData.victory_type === 'PEACE'
+                        ? `☮️ PEACE VICTORY: ${stateData.winner_name} have reached a lasting accord!`
+                        : stateData.victory_type === 'DOMINATION'
+                            ? `👑 DOMINATION VICTORY: ${stateData.winner_name} has conquered the world!`
+                            : `🏆 SCORE VICTORY: ${stateData.winner_name} emerges supreme!`;
+                    pushLog('SYSTEM', victoryMsg, 'system');
+                }
             } catch (e) { }
         }
 
-        btnNext.addEventListener('click', () => {
-            if (!isAutoplaying) pushLog('YOU', 'Decided to advance the timeline.');
-            processTurn();
-        });
+
 
         btnAuto.addEventListener('click', () => {
             isAutoplaying = !isAutoplaying;

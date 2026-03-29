@@ -108,6 +108,8 @@ class Nation:
     
     pending_trade_agreements: List[int] = field(default_factory=list)
     pending_research_pacts: List[int] = field(default_factory=list)
+    pending_joint_wars: List[Dict[str, int]] = field(default_factory=list) # e.g. [{"proposer": 1, "enemy": 2}]
+    pending_peace_treaties: List[int] = field(default_factory=list)
     
     absorbed_gold_yield: int = 0
     absorbed_prod_yield: int = 0
@@ -149,6 +151,8 @@ class Nation:
             "active_research_pacts": self.active_research_pacts,
             "pending_trade_agreements": self.pending_trade_agreements,
             "pending_research_pacts": self.pending_research_pacts,
+            "pending_joint_wars": self.pending_joint_wars,
+            "pending_peace_treaties": self.pending_peace_treaties,
             "absorbed_gold_yield": self.absorbed_gold_yield,
             "absorbed_prod_yield": self.absorbed_prod_yield,
             "absorbed_sci_yield": self.absorbed_sci_yield,

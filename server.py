@@ -52,10 +52,24 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             nations_dict = {nid: nation.to_dict() for nid, nation in game.state.nations.items()}
 
+            winner_id = game.check_winner()
+            winner_name = None
+            victory_type = None
+            if winner_id is not None:
+                if isinstance(winner_id, list):
+                    # Peace victory: multiple survivors
+                    winner_name = ", ".join(game.state.nations[wid].name for wid in winner_id)
+                    victory_type = "PEACE"
+                else:
+                    winner_name = game.state.nations[winner_id].name
+                    victory_type = "DOMINATION" if game.state.turn < 150 else "SCORE"
+
             state_dict = {
                 "turn": game.state.turn,
                 "current_player": game.state.current_player,
-                "winner": game.check_winner(),
+                "winner": winner_id,
+                "winner_name": winner_name,
+                "victory_type": victory_type,
                 "ai_players": ai_players,
                 "nations": nations_dict,
                 "diplomacy": diplomacy_dict
@@ -127,7 +141,14 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                 msg = "Command received"
 
                 if upper_cmd == "SUBMIT_TURN":
-                    # Let AIs queue their actions
+                    # Block further processing once game is over
+                    if game.check_winner() is not None:
+                        logs = ["⏹️ The game has concluded. No further turns may be processed."]
+                        success = True
+                        self.wfile.write(json.dumps({"success": success, "message": "Game Over", "logs": logs, "turn": game.state.turn}, cls=GameEncoder).encode())
+                        return
+
+                    # Let AIs queue their actions (skip defeated)
                     for ai in ai_players:
                         if ai in game.state.nations and not game.state.nations[ai].is_defeated:
                             agent = game.agents[ai]

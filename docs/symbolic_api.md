@@ -60,7 +60,8 @@ The AI generates a strict JSON payload matching the `AgentTurnResponse` Pydantic
 
 ### Action Vocabulary Validations
 - `HARVEST`: Target must be a resource string (`"GOLD"`, `"MANPOWER"`, `"PRODUCTION"`, `"SCIENCE"`, `"CIVICS"`).
-- `DECLARE_WAR`, `PROPOSE_ALLIANCE`, `ACCEPT_ALLIANCE`, `PROPOSE_TRADE`, `ACCEPT_TRADE`, `PROPOSE_RESEARCH`, `ACCEPT_RESEARCH`, `MILITARY_STRIKE`: Target must be an integer, the `id` of another nation.
+- `DECLARE_WAR`, `PROPOSE_ALLIANCE`, `ACCEPT_ALLIANCE`, `CANCEL_ALLIANCE`, `PROPOSE_TRADE`, `ACCEPT_TRADE`, `PROPOSE_RESEARCH`, `ACCEPT_RESEARCH`, `MILITARY_STRIKE`, `SABOTAGE`, `SKIRMISH`: Target must be an integer, the `id` of another nation.
 - `RESEARCH`, `PURSUE_CIVIC`: Target must be a string containing the name of the tech/civic.
+- **`PROPOSE_JOINT_WAR`, `ACCEPT_JOINT_WAR`**: Target must be an integer representing the ally you are communicating with. AND you must supply the `"enemy"` field in the JSON with an integer representing the mutual target. Example: `{"action": "PROPOSE_JOINT_WAR", "target": 1, "enemy": 2}`.
 
 > **Note on Limits:** Do not propose more actions in your `actions` array than your `actions.max_points`. Excess actions will fail validation or be ignored by the engine queue.

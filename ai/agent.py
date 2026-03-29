@@ -2,7 +2,7 @@ import random
 from typing import List
 from core.game_state import GameState
 from engine.actions import ActionHandler
-from core.constants import Resource, Tech, Civic, DiplomaticState
+from core.constants import Tech, Civic, DiplomaticState
 
 class AIAgent:
     def __init__(self, player_id: int):

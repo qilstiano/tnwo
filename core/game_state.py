@@ -170,3 +170,92 @@ class GameState:
             if scores:
                 return max(scores, key=scores.get)
         return None
+
+    def get_symbolic_state(self, player_id: int) -> dict:
+        """
+        Generates a symbolic representation of the game state from the perspective
+        of `player_id`. Hides specific exact stats of other nations unless visible.
+        """
+        my_nation = self.nations.get(player_id)
+        if not my_nation:
+             return {"error": "Invalid player ID"}
+
+        # 1. Global State
+        active_nations = [n.id for n in self.nations.values() if not n.is_defeated]
+        global_data = {
+            "turn": self.turn,
+            "active_nations": active_nations
+        }
+
+        # 2. My State
+        my_data = {
+            "id": my_nation.id,
+            "name": my_nation.name,
+            "personality": my_nation.personality,
+            "is_defeated": my_nation.is_defeated,
+            "stats": {
+                "gold": my_nation.gold,
+                "manpower": my_nation.manpower,
+                "production": my_nation.production,
+                "science": my_nation.science,
+                "civics": my_nation.civics,
+                "military": my_nation.military
+            },
+            "yields": {
+                "gold_yield": my_nation.gold_yield + my_nation.absorbed_gold_yield,
+                "manpower_yield": my_nation.manpower_yield,
+                "production_yield": my_nation.production_yield + my_nation.absorbed_prod_yield,
+                "science_yield": my_nation.science_yield + my_nation.absorbed_sci_yield,
+                "civic_yield": my_nation.civic_yield
+            },
+            "tech": {
+                "unlocked": my_nation.unlocked_techs,
+                "current": my_nation.current_tech,
+                "progress": my_nation.tech_progress
+            },
+            "civic": {
+                "unlocked": my_nation.unlocked_civics,
+                "current": my_nation.current_civic,
+                "progress": my_nation.civic_progress
+            },
+            "actions": {
+                "max_points": my_nation.max_action_points,
+                "current_points": my_nation.action_points
+            },
+            "status": {
+                "infrastructure_health": my_nation.infrastructure_health,
+                "war_exhaustion": my_nation.war_exhaustion
+            },
+            "diplomacy": {
+                "active_trade_agreements": my_nation.active_trade_agreements,
+                "active_research_pacts": my_nation.active_research_pacts,
+                "pending_trade_agreements": my_nation.pending_trade_agreements,
+                "pending_research_pacts": my_nation.pending_research_pacts,
+                "grievances": my_nation.grievances
+            }
+        }
+
+        # 3. Other Nations State
+        others_data = []
+        for n_id, n in self.nations.items():
+            if n_id == player_id: continue
+            
+            diplomatic_status = self.get_diplomatic_state(player_id, n_id).name
+            tier = len(n.unlocked_techs) + 1
+            
+            others_data.append({
+                "id": n.id,
+                "name": n.name,
+                "is_defeated": n.is_defeated,
+                "diplomatic_status": diplomatic_status,
+                "visible_status": {
+                    "infrastructure_health": n.infrastructure_health,
+                    "estimated_tech_tier": tier
+                }
+            })
+
+        return {
+            "global_state": global_data,
+            "my_nation": my_data,
+            "other_nations": others_data
+        }

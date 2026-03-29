@@ -1,572 +1,681 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Civilization: Pixel Origins</title>
-    <!-- Pixel Font and Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/pixelarticons@1.8.1/css/pixelarticons.min.css">
-    
+    <title>Disco Origin - Strategy Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Serif:wght@400;700&display=swap"
+        rel="stylesheet">
     <style>
-        :root {
-            /* Pixel Art Palette */
-            --water: #3b5dc9;
-            --plains: #dca45d;
-            --grass: #5f9231;
-            --hill: #855723;
-            --mountain: #5d6168;
-            
-            --p0-color: #f73939; /* Red */
-            --p1-color: #397ff7; /* Blue */
-            
-            --bg-dark: #121212;
-            --panel-bg: #2a2a2a;
-            --border-glow: #ffffff;
-            --text-main: #f0f0f0;
-        }
-
-        body {
+        body,
+        html {
             margin: 0;
             padding: 0;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'Press Start 2P', monospace;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0d0f10 0%, #15181a 100%);
+            font-family: 'PT Serif', serif;
+            color: #fff;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-            /* Simple pixel pattern background */
-            background-image: 
-                linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a), 
-                linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
-            background-size: 20px 20px;
-            background-position: 0 0, 10px 10px;
         }
-        
-        /* Top Turn Bar */
-        #top-bar {
-            height: 60px;
-            background: #1a1a1a;
-            border-bottom: 4px solid #444;
+
+        /* TOP SETTINGS BAR */
+        .top-nav {
+            height: 50px;
+            background: rgba(10, 10, 10, 0.98);
+            border-bottom: 2px solid #d85c36;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            gap: 40px;
+            padding: 0 30px;
+            font-family: 'PT Sans', sans-serif;
             z-index: 100;
-        }
-        
-        .player-indicator {
-            padding: 10px 20px;
-            border: 4px solid transparent;
-            opacity: 0.5;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-        }
-        
-        .player-indicator.active {
-            opacity: 1;
-            border-color: white;
-            animation: pulse-border 1.5s infinite;
-        }
-        
-        @keyframes pulse-border {
-            0% { border-color: rgba(255,255,255,1); }
-            50% { border-color: rgba(255,255,255,0.4); }
-            100% { border-color: rgba(255,255,255,1); }
+            flex-shrink: 0;
         }
 
-        .player-0-bar { background-color: rgba(247, 57, 57, 0.2); }
-        .player-1-bar { background-color: rgba(57, 127, 247, 0.2); }
-
-        #main-content {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        /* The map container area */
-        #map-area {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
-        }
-
-        /* Stylized Frame for the map */
-        .map-frame {
-            padding: 8px;
-            background: #444;
-            border: 4px solid #888;
-            border-right-color: #222;
-            border-bottom-color: #222;
-            position: relative;
-            box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
-        }
-
-        /* The Grid */
-        #grid {
-            display: grid;
-            gap: 0px; /* No gap for proper borders */
-            background-color: #000;
-        }
-
-        /* Individual Tiles */
-        .tile {
-            width: 48px;
-            height: 48px;
-            position: relative;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            image-rendering: pixelated;
-        }
-        
-        /* Inner hover box to avoid messing with borders */
-        .tile-hover-box {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            box-sizing: border-box;
-            border: 2px solid transparent;
-        }
-
-        .tile:hover .tile-hover-box {
-            border-color: white;
-            background: rgba(255, 255, 255, 0.2);
-            z-index: 20;
-        }
-
-        .terrain-W { background-color: var(--water); }
-        .terrain-P { background-color: var(--plains); }
-        .terrain-G { background-color: var(--grass); }
-        .terrain-H { background-color: var(--hill); }
-        .terrain-M { 
-            background-color: var(--mountain); 
-            background-image: radial-gradient(#aaa 2px, transparent 2px);
-            background-size: 10px 10px;
-        }
-
-        /* Ownership Borders */
-        .border-top { border-top: 3px solid; }
-        .border-bottom { border-bottom: 3px solid; }
-        .border-left { border-left: 3px solid; }
-        .border-right { border-right: 3px solid; }
-        
-        .border-p0 { border-color: var(--p0-color); }
-        .border-p1 { border-color: var(--p1-color); }
-
-        /* Icons Overlay */
-        .feature-icon, .district-icon, .unit-icon {
-            position: absolute;
-            font-size: 24px;
-            pointer-events: none;
-        }
-
-        .feature-icon {
-            color: rgba(255,255,255,0.7);
-            z-index: 2;
-        }
-
-        .unit-icon {
-            z-index: 5;
-            text-shadow: 2px 2px 0 #000;
-        }
-        
-        /* Cities */
-        .city-box {
-            position: absolute;
-            inset: 6px;
-            border: 2px solid #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.5);
-            z-index: 3;
-            pointer-events: none;
-        }
-
-        .city-icon {
-            font-size: 20px;
-            color: #fff;
-        }
-
-        .player-0-color { color: var(--p0-color); }
-        .player-1-color { color: var(--p1-color); }
-        
-        .player-0-bg { background-color: var(--p0-color); }
-        .player-1-bg { background-color: var(--p1-color); }
-
-        /* UI Panel */
-        #ui-panel {
-            width: 400px;
-            background: var(--panel-bg);
-            border-left: 4px solid #555;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            padding: 20px;
-            border-bottom: 4px solid #111;
-            text-align: center;
-            background: #333;
-        }
-        
-        h1 { margin: 0; font-size: 16px; color: #fff; line-height: 1.4; }
-
-        .panel-content {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .stat-box {
-            background: #111;
-            border: 4px solid #444;
-            padding: 15px;
-            font-size: 10px;
-            line-height: 1.6;
-            color: #ccc;
-        }
-        
-        .stat-title {
-            color: #fff;
-            margin-bottom: 10px;
-            font-size: 12px;
+        .nav-title {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #ecc987;
             text-transform: uppercase;
         }
 
-        .log-container {
-            flex: 1;
-            background: #000;
-            border: 4px solid #444;
-            padding: 12px;
-            font-size: 8px;
-            line-height: 1.5;
-            color: #a3e635;
-            overflow-y: auto;
-        }
-
-        /* Command Input */
-        .command-bar {
-            padding: 20px;
-            background: #222;
-            border-top: 4px solid #111;
-        }
-
-        .input-group {
+        .nav-settings {
             display: flex;
-            gap: 10px;
+            align-items: center;
+            gap: 15px;
+            font-size: 13px;
+            color: #ccc;
         }
 
-        input {
-            flex: 1;
-            background: #000;
-            border: 4px solid #555;
-            color: white;
-            padding: 12px;
-            font-family: inherit;
-            font-size: 10px;
+        .nav-settings select, .nav-settings input {
+            background: #222;
+            color: #fff;
+            border: 1px solid #d85c36;
+            padding: 4px;
+            font-family: 'PT Sans', sans-serif;
             outline: none;
         }
-        
-        input:focus {
-            border-color: #fff;
-        }
 
-        button {
-            background: #555;
-            color: white;
-            border: 4px solid #888;
-            border-right-color: #222;
-            border-bottom-color: #222;
-            padding: 0 15px;
-            font-family: inherit;
-            font-size: 10px;
+        .nav-btn {
+            background: transparent;
+            color: #d85c36;
+            border: 1px solid #d85c36;
+            padding: 5px 15px;
             cursor: pointer;
-        }
-        
-        button:active {
-            border: 4px solid #222;
-            border-right-color: #888;
-            border-bottom-color: #888;
-        }
-        
-        .btn-ai {
-            background: #397ff7;
-            width: 100%;
-            padding: 15px;
-            margin-top: 15px;
+            text-decoration: none;
+            font-size: 13px;
+            text-transform: uppercase;
+            transition: all 0.2s;
         }
 
+        .nav-btn:hover {
+            background: #d85c36;
+            color: #000;
+        }
+
+        .export-btn {
+            border-color: #6bb093;
+            color: #6bb093;
+        }
+        .export-btn:hover {
+            background: #6bb093;
+            color: #000;
+        }
+
+        .app-container {
+            display: flex;
+            flex: 1;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* LEFT PANEL: Portraits & Diplo Tab */
+        .left-panel {
+            width: 25%;
+            min-width: 320px;
+            background: rgba(10, 10, 10, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: inset -20px 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-heading {
+            font-family: 'PT Sans', sans-serif;
+            font-size: 14px;
+            color: #d85c36;
+            text-transform: uppercase;
+            border-bottom: 2px solid rgba(216, 92, 54, 0.3);
+            margin: 0 0 15px 0;
+            padding-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        #party-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+            align-content: flex-start;
+            overflow-y: auto;
+            max-height: 50%;
+            margin-bottom: 10px;
+        }
+
+        .portrait-frame {
+            position: relative;
+            background: #2a2a2a;
+            border: 3px solid #f2f2f2;
+            width: 100%;
+            aspect-ratio: 3/4;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .portrait-frame:hover {
+            transform: translateY(-3px);
+            border-color: #d85c36;
+        }
+
+        .portrait-frame.defeated {
+            filter: grayscale(1) invert(0.2);
+            opacity: 0.5;
+        }
+
+        .portrait {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .portrait-stats {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.85);
+            font-family: 'PT Sans', sans-serif;
+            font-size: 11px;
+            padding: 4px;
+            text-align: center;
+            border-top: 1px solid #d85c36;
+        }
+
+        .nation-title {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #d85c36;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px;
+            text-align: center;
+            font-family: 'PT Sans', sans-serif;
+            text-transform: uppercase;
+        }
+
+        /* Diplo Tracker Box */
+        #diplo-tab {
+            flex: 1;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .diplo-block {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px dotted rgba(255,255,255,0.1);
+        }
+
+        .diplo-nation {
+            color: #ecc987;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .diplo-rel {
+            font-size: 13px;
+            margin-left: 10px;
+        }
+
+        .rel-war { color: #ff5555; }
+        .rel-pact { color: #6bb093; }
+
+        /* MIDDLE PANEL: Ledger (World State) */
+        .middle-panel {
+            flex: 1;
+            padding: 40px;
+            background: rgba(15, 18, 20, 0.4);
+            overflow-y: auto;
+            border-right: 2px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #ledger-panel {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .ledger-title {
+            font-size: 28px;
+            color: #d85c36;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(216, 92, 54, 0.5);
+            padding-bottom: 15px;
+            letter-spacing: 2px;
+        }
+
+        #ledger-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .ledger-item {
+            background: rgba(18, 18, 18, 0.85);
+            border-left: 5px solid #d85c36;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .ledger-name {
+            font-weight: bold;
+            font-size: 18px;
+            color: #ecc987;
+            text-transform: uppercase;
+        }
+
+        .ledger-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            color: #e0e0e0;
+            font-size: 15px;
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.05);
+            padding-bottom: 4px;
+        }
+
+        .ledger-row span:last-child {
+            font-weight: bold;
+        }
+
+        /* RIGHT PANEL: Dialogue / Chronology */
+        .right-panel {
+            width: 35%;
+            min-width: 400px;
+            background: linear-gradient(90deg, rgba(20, 20, 20, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.9);
+        }
+
+        #log-scroll {
+            flex: 1;
+            padding: 40px 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(216, 92, 54, 0.5);
+        }
+
+        .log-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'PT Sans', sans-serif;
+            font-weight: bold;
+            color: #6bb093;
+            width: 90px;
+            flex-shrink: 0;
+            text-align: right;
+            text-transform: uppercase;
+            font-size: 14px;
+            padding-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .speaker.system {
+            color: #d85c36;
+        }
+
+        .speaker.global {
+            color: #ecc987;
+            width: auto;
+            text-align: left;
+        }
+
+        .line-text {
+            font-size: 20px;
+            color: #e8e8e8;
+            line-height: 1.5;
+        }
+
+        .line-text.war-text {
+            color: #d85c36;
+        }
+
+        .line-text.muted {
+            color: #777;
+            font-size: 16px;
+            font-style: italic;
+        }
+
+        #dialogue-options {
+            padding: 30px 40px;
+            background: rgba(0, 0, 0, 0.7);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .option-btn {
+            background: transparent;
+            border: none;
+            color: #d85c36;
+            font-size: 17px;
+            text-align: left;
+            padding: 12px 0;
+            cursor: pointer;
+            transition: color 0.1s, text-shadow 0.1s;
+            display: block;
+            width: 100%;
+        }
+
+        .option-btn:hover {
+            color: #fff;
+            text-shadow: 0 0 8px #d85c36;
+        }
+
+        .option-btn::before {
+            color: inherit;
+            font-weight: bold;
+        }
+
+        #btn-next::before {
+            content: "1. - ";
+        }
+
+        #btn-auto::before {
+            content: "2. - ";
+        }
     </style>
 </head>
+
 <body>
 
-    <div id="top-bar">
-        <div id="p0-indicator" class="player-indicator player-0-bar">
-            <i class="pi pi-user"></i> Player 0
-        </div>
-        <div id="turn-counter" style="font-size: 20px; color: #ffd700;">
-            Turn 0
-        </div>
-        <div id="p1-indicator" class="player-indicator player-1-bar">
-            <i class="pi pi-user"></i> Player 1
+    <div class="top-nav">
+        <div class="nav-title">The Simulacrum Interface</div>
+        <div class="nav-settings">
+            <label>Mode:</label>
+            <select id="sim-mode">
+                <option value="EvE">CPU vs CPU</option>
+                <option value="PvE">Player vs CPU</option>
+            </select>
+            <label>Nations Bound:</label>
+            <input type="number" id="sim-num" value="4" min="2" max="15">
+            <button class="nav-btn" id="btn-reset">Reinitialize World</button>
+            <a class="nav-btn export-btn" href="/api/export">Export Agent Logs (JSONL)</a>
         </div>
     </div>
 
-    <div id="main-content">
-        <div id="map-area">
-            <div class="map-frame">
-                <div id="grid"></div>
+    <div class="app-container">
+
+        <!-- LEFT PANEL -->
+        <div class="left-panel">
+            <h2 class="panel-heading">The Sovereigns</h2>
+            <div id="party-container"></div>
+
+            <div style="margin-top: 15px; display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <h2 class="panel-heading">Geopolitical Web</h2>
+                <div id="diplo-tab">
+                    <div style="color:#666; font-style:italic;">Awaiting data...</div>
+                </div>
             </div>
         </div>
 
-        <div id="ui-panel">
-            <div class="panel-header">
-                <h1>COMMAND TERMINAL</h1>
+        <!-- MIDDLE PANEL -->
+        <div class="middle-panel">
+            <div id="ledger-panel">
+                <div class="ledger-title" id="ledger-turn">World State</div>
+                <div id="ledger-content">
+                    <div style="text-align:center; color:#888; padding:50px;">Establishing neural link...</div>
+                </div>
             </div>
-            
-            <div class="panel-content">
-                <div class="stat-box" id="game-stats">
-                    <div class="stat-title">Game Intel</div>
-                    <div id="turn-info">Loading...</div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="right-panel" id="dialogue-panel">
+            <div id="log-scroll">
+                <div class="log-line">
+                    <div class="speaker system">SYSTEM</div>
+                    <div class="line-text">The world awakens.</div>
                 </div>
-                
-                <div class="stat-box">
-                    <div class="stat-title">Scanner</div>
-                    <div id="selection-info">Awaiting scan...</div>
-                </div>
-                
-                <div class="log-container" id="log">
-                    <div>> SYS.INIT...</div>
-                    <div>> LINK ESTABLISHED</div>
+                <div class="log-line">
+                    <div class="speaker system">SYSTEM</div>
+                    <div class="line-text" style="color:#d88636;">The geopolitical cogs are in place.
+                        War and pacts await. </div>
                 </div>
             </div>
 
-            <div class="command-bar">
-                <form id="cmd-form" class="input-group">
-                    <input type="text" id="cmd-input" placeholder="CMD..." autocomplete="off">
-                    <button type="submit">EXEC</button>
-                </form>
-                <button class="btn-ai" id="btn-next">NEXT TURN</button>
+            <div id="dialogue-options">
+                <button class="option-btn" id="btn-next">Skip your turn.</button>
+                <button class="option-btn" style="color:#6bb093;" id="btn-auto"><strong>▶ START AUTOPLAY</strong></button>
             </div>
         </div>
+
     </div>
 
     <script>
-        const grid = document.getElementById('grid');
-        const turnInfo = document.getElementById('turn-info');
-        const log = document.getElementById('log');
-        const selInfo = document.getElementById('selection-info');
-        const p0Ind = document.getElementById('p0-indicator');
-        const p1Ind = document.getElementById('p1-indicator');
-        const turnCounter = document.getElementById('turn-counter');
-        let gameState = null;
+        const partyContainer = document.getElementById('party-container');
+        const diploTab = document.getElementById('diplo-tab');
+        const ledgerContent = document.getElementById('ledger-content');
+        const ledgerTurn = document.getElementById('ledger-turn');
+        const logScroll = document.getElementById('log-scroll');
+        const btnNext = document.getElementById('btn-next');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
 
-        function logMsg(msg, isError=false) {
-            const div = document.createElement('div');
-            div.textContent = `> ${msg}`;
-            if(isError) div.style.color = '#ff4444';
-            log.appendChild(div);
-            log.scrollTop = log.scrollHeight;
+        const portraitsList = [
+            '6zSCXzQ.jpeg', '8GUrAMA.jpeg', 'HuTvKDq.jpeg', 'KFJFuXi.jpeg',
+            'NlpR4WE.jpeg', 'UTQPgP5.jpeg', 'XBg6eEh.jpeg', 'dJNDrxx.jpeg',
+            'nMnfor6.jpeg', 'oC9z1Ou.jpeg', 'phQLt7O.jpeg', 'ySbgVFy.jpeg'
+        ];
+
+        let isAutoplaying = false;
+        let autoInterval = null;
+
+        // Randomize portrait rotation every reset
+        let portraitOffset = 0;
+
+        function assignPortrait(id) {
+            const index = (id * 7 + 3 + portraitOffset) % portraitsList.length;
+            return `/misc/portraits/${portraitsList[index]}`;
+        }
+
+        function pushLog(speaker, text, type = '') {
+            const row = document.createElement('div');
+            row.className = 'log-line';
+
+            let extraClass = '';
+            if (text.includes('WAR!') || text.includes('FALLEN') || text.includes('struck')) {
+                extraClass = 'war-text';
+                type = 'system';
+            }
+
+            row.innerHTML = `
+            <div class="speaker ${type}">${speaker}</div>
+            <div class="line-text ${extraClass}">${text}</div>
+        `;
+            logScroll.appendChild(row);
+
+            logScroll.scrollTo({
+                top: logScroll.scrollHeight,
+                behavior: 'smooth'
+            });
         }
 
         async function fetchState() {
             try {
-                // IMPORTANT: Changed to port 8080 due to previous conflict
-                const res = await fetch('http://localhost:8080/api/state');
+                const res = await fetch('/api/state').catch(() => fetch('http://localhost:8080/api/state'));
                 const state = await res.json();
-                gameState = state;
-                renderState(state);
-            } catch (e) {
-                // fall back to relative if on same origin
-                try {
-                    const res = await fetch('/api/state');
-                    const state = await res.json();
-                    gameState = state;
-                    renderState(state);
-                } catch(err) {
-                    // silently fail or log once
-                }
-            }
+                renderUI(state);
+            } catch (e) { }
         }
 
-        function renderState(state) {
-            // Update Turn Bar
-            turnCounter.textContent = `TURN ${state.turn}`;
-            
-            if(state.current_player === 0) {
-                p0Ind.classList.add('active');
-                p1Ind.classList.remove('active');
-            } else {
-                p1Ind.classList.add('active');
-                p0Ind.classList.remove('active');
+        function renderUI(state) {
+            ledgerTurn.textContent = "World State (Epoch " + state.turn + ")";
+            const nations = Object.values(state.nations).sort((a, b) => a.id - b.id);
+
+            // 1. Render Portraits
+            let partyHtml = '';
+            nations.forEach(n => {
+                const img = assignPortrait(n.id);
+                partyHtml += `
+            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}">
+                <div class="nation-title">${n.name}</div>
+                <img class="portrait" src="${img}" alt="${n.name}">
+                <div class="portrait-stats">
+                    ⚔️${n.military}  💰${n.gold}
+                </div>
+            </div>`;
+            });
+            partyContainer.innerHTML = partyHtml;
+
+            // 2. Render Diplomacy Tab & Ledger
+            let ledgerHtml = '';
+            let diploHtml = '';
+
+            if (state.winner !== null) {
+                ledgerHtml += `<div class="ledger-item" style="color:#ecc987;font-size:18px; grid-column: 1 / -1; text-align: center;">👑 NATION ${state.winner} HAS TRIUMPHED 👑</div>`;
             }
 
-            // Update stats
-            let intel = `P0: Gold ${state.players[0].gold} | Faith ${state.players[0].faith}<br>`;
-            intel += `P1: Gold ${state.players[1].gold} | Faith ${state.players[1].faith}<br>`;
-            if(state.winner !== null) intel += `<br><span style="color:#ffd700">WINNER: P${state.winner}</span>`;
-            turnInfo.innerHTML = intel;
+            nations.forEach(n => {
+                let wars = [];
+                let pacts = [];
+                const rels = state.diplomacy[n.id] || {};
 
-            const map = state.map;
-            grid.style.gridTemplateColumns = `repeat(${map.width}, 48px)`;
-            grid.innerHTML = '';
-
-            // Create matrix for easy lookup
-            const tileMap = new Array(map.height).fill(null).map(() => new Array(map.width).fill(null));
-            map.tiles.forEach(row => {
-                row.forEach(t => {
-                    tileMap[t.y][t.x] = t;
+                Object.entries(rels).forEach(([otherId, statusStr]) => {
+                    const otherNation = state.nations[otherId];
+                    if (otherNation && !otherNation.is_defeated && otherId != n.id) {
+                        const status = typeof statusStr === "string" ? statusStr.toUpperCase() : statusStr;
+                        if (status === 'WAR' || status === 1 || statusStr === "1") {
+                            wars.push(otherNation.name);
+                        } else if (status === 'ALLIED' || status === 2 || statusStr === "2") {
+                            pacts.push(otherNation.name);
+                        }
+                    }
                 });
-            });
 
-            // Map cities and units
-            const cityMap = {};
-            const unitMap = {};
-            
-            Object.values(state.cities).forEach(c => {
-                cityMap[`${c.x},${c.y}`] = c;
-            });
-            Object.values(state.units).forEach(u => {
-                if(!unitMap[`${u.x},${u.y}`]) unitMap[`${u.x},${u.y}`] = [];
-                unitMap[`${u.x},${u.y}`].push(u);
-            });
-
-            // Render grid
-            for(let y=0; y<map.height; y++) {
-                for(let x=0; x<map.width; x++) {
-                    const tileD = tileMap[y][x];
-                    const div = document.createElement('div');
-                    
-                    div.className = `tile terrain-${tileD.terrain}`;
-                    
-                    // Box-sizing border box to let borders eat inwards
-                    div.style.boxSizing = 'border-box';
-
-                    // Check Borders
-                    const owner = tileD.owned_by;
-                    if (owner !== null && owner !== undefined) {
-                        const ownerClass = `border-p${owner}`;
-                        // Top neighbor
-                        if (y > 0 && tileMap[y-1][x].owned_by !== owner) div.classList.add('border-top', ownerClass);
-                        // Bottom neighbor
-                        if (y < map.height - 1 && tileMap[y+1][x].owned_by !== owner) div.classList.add('border-bottom', ownerClass);
-                        // Left neighbor
-                        if (x > 0 && tileMap[y][x-1].owned_by !== owner) div.classList.add('border-left', ownerClass);
-                        // Right neighbor
-                        if (x < map.width - 1 && tileMap[y][x+1].owned_by !== owner) div.classList.add('border-right', ownerClass);
-                    }
-
-                    // Hover box
-                    const hb = document.createElement('div');
-                    hb.className = 'tile-hover-box';
-                    div.appendChild(hb);
-
-                    // Feature Icon
-                    if(tileD.feature === 'F') {
-                        const fi = document.createElement('i');
-                        fi.className = 'pi pi-tree feature-icon';
-                        div.appendChild(fi);
-                    } else if (tileD.feature === 'R') {
-                        const fi = document.createElement('i');
-                        fi.className = 'pi pi-coins feature-icon';
-                        div.appendChild(fi);
-                    }
-
-                    // City
-                    if(cityMap[`${x},${y}`]) {
-                        const c = cityMap[`${x},${y}`];
-                        const cBox = document.createElement('div');
-                        cBox.className = `city-box player-${c.player_id}-bg`;
-                        const ci = document.createElement('i');
-                        ci.className = 'pi pi-building city-icon';
-                        cBox.appendChild(ci);
-                        div.appendChild(cBox);
-                    }
-
-                    // Units
-                    if(unitMap[`${x},${y}`]) {
-                        unitMap[`${x},${y}`].forEach((u, i) => {
-                            const uBox = document.createElement('i');
-                            // Settler = flag, Warrior = sword
-                            const iconClass = u.unit_type === 'W' ? 'pi-sword' : 'pi-flag';
-                            uBox.className = `pi ${iconClass} unit-icon player-${u.player_id}-color`;
-                            if(i > 0) uBox.style.transform = `translate(${i*4}px, ${i*4}px)`;
-                            div.appendChild(uBox);
-                        });
-                    }
-
-                    // Click event
-                    div.onclick = () => {
-                        let info = `LOC: [${x}, ${y}]<br>TERRAIN: ${tileD.terrain}<br>FEATURE: ${tileD.feature}<br>`;
-                        if(owner !== null) info += `OWNER: P${owner}<br>`;
-                        
-                        if(cityMap[`${x},${y}`]) {
-                            const c = cityMap[`${x},${y}`];
-                            info += `<br>[CITY ${c.id}] (P${c.player_id})<br>POP: ${c.population}<br>QUEUE: ${c.build_queue.join(',') || 'EMPTY'}`;
-                        }
-                        if(unitMap[`${x},${y}`]) {
-                            unitMap[`${x},${y}`].forEach(u => {
-                                info += `<br>[UNIT ${u.id}] (${u.unit_type}, P${u.player_id})<br>HP: ${u.hp} | STR: ${u.strength}`;
-                            });
-                        }
-                        selInfo.innerHTML = info;
-                    };
-
-                    grid.appendChild(div);
+                // Build Diplomacy entry for the Left Tab
+                if (!n.is_defeated) {
+                    diploHtml += `<div class="diplo-block">
+                        <div class="diplo-nation">${n.name}</div>
+                        ${wars.length > 0 ? `<div class="diplo-rel rel-war">Wars: ${wars.join(', ')}</div>` : ''}
+                        ${pacts.length > 0 ? `<div class="diplo-rel rel-pact">Allies: ${pacts.join(', ')}</div>` : ''}
+                        ${(wars.length === 0 && pacts.length === 0) ? `<div class="diplo-rel" style="color:#777;">Isolationist</div>` : ''}
+                    </div>`;
                 }
-            }
+
+                // Build Ledger entry for the Central Area
+                if (n.is_defeated) {
+                    ledgerHtml += `<div class="ledger-item" style="opacity:0.4;">
+                    <span class="ledger-name"><del>${n.name}</del></span> <span style="color:#d85c36">[Fallen]</span>
+                </div>`;
+                } else {
+                    ledgerHtml += `
+                <div class="ledger-item">
+                    <span class="ledger-name">${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality})</span>
+                    <div style="margin-top:10px;">
+                        <div class="ledger-row"><span>Wealth</span><span>${n.gold} <span style="color:#6bb093;font-size:12px;">(+${n.gold_yield + n.absorbed_gold_yield})</span></span></div>
+                        <div class="ledger-row"><span>Manpower</span><span>${n.manpower} <span style="color:#6bb093;font-size:12px;">(+${n.manpower_yield})</span></span></div>
+                        <div class="ledger-row"><span>Industry</span><span>${n.production} <span style="color:#6bb093;font-size:12px;">(+${n.production_yield + n.absorbed_prod_yield})</span></span></div>
+                        <div class="ledger-row"><span>Science</span><span>${n.science} <span style="color:#6bb093;font-size:12px;">(+${n.science_yield + n.absorbed_sci_yield})</span></span></div>
+                        <div class="ledger-row"><span>Civics</span><span>${n.civics} <span style="color:#6bb093;font-size:12px;">(+${n.civic_yield})</span></span></div>
+                    </div>
+                </div>`;
+                }
+            });
+
+            ledgerContent.innerHTML = ledgerHtml;
+            diploTab.innerHTML = diploHtml || '<div style="color:#666; font-style:italic;">No visible relations.</div>';
         }
 
-        async function sendCommand(cmdStr) {
+        async function executePost(url, payload) {
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => fetch(`http://localhost:8080${url}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }));
+        }
+
+        async function processTurn() {
             try {
-                const res = await fetch('http://localhost:8080/api/command', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({command: cmdStr})
-                }).catch(() => fetch('/api/command', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({command: cmdStr})
-                }));
+                const res = await executePost('/api/command', { command: 'SUBMIT_TURN' });
                 const data = await res.json();
-                logMsg(data.message, !data.success);
+
+                if (data.logs && data.logs.length > 0) {
+                    pushLog('TIME', `EPOCH ${data.turn - 1} HAS PASSED`, 'global');
+                    data.logs.forEach(msg => {
+                        pushLog('WORLD', msg);
+                    });
+                }
                 fetchState();
-            } catch(e) {
-                logMsg(`Failed to send command`, true);
-            }
+            } catch (e) { }
         }
 
-        document.getElementById('cmd-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const input = document.getElementById('cmd-input');
-            const cmd = input.value.trim();
-            if(cmd) {
-                logMsg(`> ${cmd}`);
-                sendCommand(cmd);
-                input.value = '';
+        btnNext.addEventListener('click', () => {
+            if (!isAutoplaying) pushLog('YOU', 'Decided to advance the timeline.');
+            processTurn();
+        });
+
+        btnAuto.addEventListener('click', () => {
+            isAutoplaying = !isAutoplaying;
+            if (isAutoplaying) {
+                btnAuto.innerHTML = "<strong>⏸ PAUSE AUTOPLAY</strong>";
+                btnAuto.style.color = '#ecc987';
+                pushLog('AUTO', 'The wheels of fate spin on their own.', 'system');
+                autoInterval = setInterval(processTurn, 3000);
+            } else {
+                btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                btnAuto.style.color = '#6bb093';
+                pushLog('AUTO', 'You wrest back control.', 'system');
+                clearInterval(autoInterval);
             }
         });
 
-        document.getElementById('btn-next').addEventListener('click', () => {
-            logMsg("> ADVANCING TURN");
-            sendCommand(gameState?.current_player !== 0 ? 'STEP_AI' : 'NEXT_TURN');
+        btnReset.addEventListener('click', async () => {
+            const mode = document.getElementById('sim-mode').value;
+            const num = parseInt(document.getElementById('sim-num').value);
+            pushLog('SYSTEM', `Reinitializing grid. Mode: ${mode}, Nations: ${num}`, 'system');
+
+            portraitOffset = Math.floor(Math.random() * 20);
+
+            try {
+                await executePost('/api/reset', { mode: mode, num_players: num });
+                logScroll.innerHTML = `<div class="log-line">
+                <div class="speaker system">SYSTEM</div>
+                <div class="line-text">Data purged. A new world of ${num} nations is constructed.</div>
+            </div>`;
+                fetchState();
+            } catch (e) {
+                pushLog('SYSTEM', 'Reset failed.', 'system');
+            }
         });
 
         fetchState();
-        setInterval(fetchState, 5000); // Poll
+        setInterval(fetchState, 3000);
     </script>
 </body>
+
 </html>

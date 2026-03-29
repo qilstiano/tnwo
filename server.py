@@ -65,6 +65,19 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(response.encode('utf-8'))
             return
 
+        elif parsed.path == '/api/export':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/jsonl')
+            self.send_header('Content-Disposition', 'attachment; filename="game_export.jsonl"')
+            self._cors()
+            self.end_headers()
+            try:
+                with open("game_export.jsonl", "rb") as f:
+                    self.wfile.write(f.read())
+            except FileNotFoundError:
+                self.wfile.write(b"") # return empty file safely instead of crashing
+            return
+
         elif parsed.path == '/':
             self.path = '/index.html'
 
@@ -88,15 +101,17 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
             except:
                 data = {}
             mode = data.get("mode", "PvE")
+            num_players = int(data.get("num_players", 4))
 
-            game = make_game()
+            game = make_game(num_players)
 
             if mode == "PvP":
                 ai_players = []
             elif mode == "EvE":
-                ai_players = [0, 1, 2, 3]
+                ai_players = list(range(num_players))
             else:
-                ai_players = [1, 2, 3]
+                # PvE: Player 0 is human, rest are AI
+                ai_players = list(range(1, num_players))
 
             self.wfile.write(json.dumps({"success": True, "message": "Game reset!"}).encode())
             return
@@ -119,6 +134,21 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                             cmds = agent.decide_actions(game.state, game.handler)
                             for c in cmds:
                                 game.handler.queue_action(ai, c)
+                    
+                    # Record state + actions before resolving
+                    state_snapshot = {
+                        "turn": game.state.turn,
+                        "agents": {}
+                    }
+                    for nid, n in game.state.nations.items():
+                        state_snapshot["agents"][nid] = {
+                            "state": game.state.get_symbolic_state(nid),
+                            "queued_actions": list(n.queued_actions)
+                        }
+                    
+                    with open("game_export.jsonl", "a") as f:
+                        f.write(json.dumps(state_snapshot, cls=GameEncoder) + "\n")
+                    
                     
                     # Resolve turn
                     logs = game.handler.resolve_simultaneous_turn()

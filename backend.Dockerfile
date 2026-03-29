@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY . /app
 
+RUN pip install --no-cache-dir pydantic
+
 EXPOSE 8080
 
 CMD ["python", "-u", "server.py"]

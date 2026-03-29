@@ -20,7 +20,8 @@ class GameState:
         
         for i in range(num_players):
             name = NATION_NAMES[i % len(NATION_NAMES)]
-            color = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"][i]
+            colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"]
+            color = colors[i % len(colors)]
             pers = random.choice(PERSONALITIES)
             
             n = Nation(id=i, name=name, color=color, personality=pers)
@@ -134,10 +135,9 @@ class GameState:
             if len(nation.unlocked_techs) >= 3:
                 nation.achievements.university_network = True
                 sci_mod += 0.20
-            if len(nation.unlocked_civics) >= 3:
+            if len(nation.unlocked_civics) >= 3 and not nation.achievements.bureaucracy:
                 nation.achievements.bureaucracy = True
                 nation.civic_yield = max(nation.civic_yield, int(nation.civic_yield * 1.2))
-                
     def get_tech_cost(self, tech_name: str) -> int:
         cost = TECH_COSTS.get(tech_name, 100)
         # Check modifiers

@@ -442,7 +442,7 @@
                 <option value="PvE">Player vs CPU</option>
             </select>
             <label>Nations Bound:</label>
-            <input type="number" id="sim-num" value="4" min="2" max="15">
+            <input type="number" id="sim-num" value="5" min="2" max="15">
             <button class="nav-btn" id="btn-reset">Reinitialize World</button>
             <a class="nav-btn export-btn" href="/api/export">Export Agent Logs (JSONL)</a>
         </div>
@@ -507,6 +507,7 @@
         ];
 
         let isAutoplaying = false;
+        let lastState = null;
         let autoInterval = null;
 
         // Randomize portrait rotation every reset
@@ -548,6 +549,7 @@
         }
 
         function renderUI(state) {
+            lastState = state;
             ledgerTurn.textContent = "World State (Epoch " + state.turn + ")";
             const topCounter = document.getElementById('top-turn-counter');
             if (topCounter) topCounter.textContent = state.turn;
@@ -569,13 +571,22 @@
 
             // 1. Render Portraits
             let partyHtml = '';
+            const strategyLabels = {
+                "neutral": "🔘 NEUTRAL",
+                "expansionist": "⚔️ EXPANSIONIST",
+                "scientific": "🔬 SCIENTIFIC",
+                "mercantile": "💰 MERCANTILE",
+                "diplomatic": "🕊️ DIPLOMATIC"
+            };
             nations.forEach(n => {
                 const img = assignPortrait(n.id);
                 const color = archColors[n.personality] || n.color;
                 const icon = archIcons[n.personality] || "🏳️";
+                const strategy = state.strategies && state.strategies[n.id] ? state.strategies[n.id] : "";
+                const stratLabel = strategyLabels[strategy] || "";
                 partyHtml += `
-            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}" style="border-color:${color};">
-                <div class="nation-title" style="background:${color}; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${icon} ${n.name} <div style="font-size:7px; opacity:0.8; font-weight:normal;">(${n.personality})</div></div>
+            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}\nStrategy: ${strategy}" style="border-color:${color};">
+                <div class="nation-title" style="background:${color}; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${icon} ${n.name} <div style="font-size:7px; opacity:0.8; font-weight:normal;">${n.personality}${stratLabel ? ' · ' + stratLabel : ''}</div></div>
                 <img class="portrait" src="${img}" alt="${n.name}">
                 ${n.is_defeated ? '<div class="failed-stamp">FAILED STATE</div>' : ''}
                 <div class="portrait-stats">
@@ -645,7 +656,7 @@
                 } else {
                     ledgerHtml += `
                 <div class="ledger-item" style="border-left: 5px solid ${color};">
-                    <span class="ledger-name" style="color:${color}">${icon} ${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality})</span>
+                    <span class="ledger-name" style="color:${color}">${icon} ${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality}${state.strategies && state.strategies[n.id] ? ' · ' + state.strategies[n.id].toUpperCase() : ''})</span>
                     <div style="margin-top:10px;">
                         <div class="ledger-row"><span>💰 Wealth</span><span>${n.gold} <span style="color:#6bb093;font-size:12px;">(+${n.gold_yield + n.absorbed_gold_yield})</span></span></div>
                         <div class="ledger-row"><span>🪖 Manpower</span><span>${n.manpower} <span style="color:#6bb093;font-size:12px;">(+${n.manpower_yield})</span></span></div>
@@ -674,14 +685,23 @@
         }
 
         async function processTurn() {
+            if (lastState && lastState.winner !== null) {
+                if (isAutoplaying) {
+                    isAutoplaying = false;
+                    clearInterval(autoInterval);
+                    btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                    btnAuto.style.color = '#6bb093';
+                }
+                return;
+            }
             try {
                 const res = await executePost('/api/command', { command: 'SUBMIT_TURN' });
                 const data = await res.json();
 
                 if (data.logs && data.logs.length > 0) {
-                    // Filter logs that mention defeated nations' turns starting
-                    const filteredLogs = data.logs.filter(msg => !msg.startsWith('--- RESOLVING'));
-                    if (filteredLogs.length > 0) {
+                    // Filter out resolution headers and game-over messages
+                    const filteredLogs = data.logs.filter(msg => !msg.startsWith('--- RESOLVING') && !msg.includes('game has concluded'));
+                    if (filteredLogs.length > 0 && data.message !== "Game Over") {
                         pushLog('TIME', `EPOCH ${data.turn - 1} HAS PASSED`, 'global');
                         filteredLogs.forEach(msg => {
                             pushLog('WORLD', msg);

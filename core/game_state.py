@@ -177,7 +177,7 @@ class GameState:
         # Domination victory: only one nation survives
         if len(active_nations) == 1:
             return active_nations[0]
-        
+
         # No nations left (edge case)
         if len(active_nations) == 0:
             return None
@@ -194,11 +194,11 @@ class GameState:
                         break
                 if not all_allied:
                     break
-            
+
             if all_allied and len(active_nations) > 1:
                 # Peace Victory — all survivors share the win
                 return active_nations
-            
+
             # Score Victory: highest combined stat score
             scores = {}
             for n in self.nations.values():

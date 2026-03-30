@@ -16,14 +16,14 @@ class GameEncoder(json.JSONEncoder):
             return obj.__dict__
         return super().default(obj)
 
-def make_game(num_players=4):
+def make_game(num_players=5):
     try:
         return CivilizationGame(num_players=num_players)
     except Exception:
-        return CivilizationGame(num_players=4)
+        return CivilizationGame(num_players=5)
 
 game = make_game()
-ai_players = [1, 2, 3]  # Default to PvE (Player 0 vs 3 CPUs)
+ai_players = [0, 1, 2, 3, 4]  # Default to EvE (all 5 nations are AI)
 
 class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -64,6 +64,7 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                     winner_name = game.state.nations[winner_id].name
                     victory_type = "DOMINATION" if game.state.turn < 150 else "SCORE"
 
+            from ai.config import NATION_STRATEGIES
             state_dict = {
                 "turn": game.state.turn,
                 "current_player": game.state.current_player,
@@ -72,7 +73,8 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "victory_type": victory_type,
                 "ai_players": ai_players,
                 "nations": nations_dict,
-                "diplomacy": diplomacy_dict
+                "diplomacy": diplomacy_dict,
+                "strategies": NATION_STRATEGIES
             }
 
             response = json.dumps(state_dict, cls=GameEncoder)
@@ -115,9 +117,12 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
             except:
                 data = {}
             mode = data.get("mode", "PvE")
-            num_players = int(data.get("num_players", 4))
+            num_players = int(data.get("num_players", 5))
 
             game = make_game(num_players)
+
+            # Clear export log on reset
+            open("game_export.jsonl", "w").close()
 
             if mode == "PvP":
                 ai_players = []
@@ -148,6 +153,8 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                         self.wfile.write(json.dumps({"success": success, "message": "Game Over", "logs": logs, "turn": game.state.turn}, cls=GameEncoder).encode())
                         return
 
+                    intent_logs = []
+
                     # Let AIs queue their actions (skip defeated)
                     for ai in ai_players:
                         if ai in game.state.nations and not game.state.nations[ai].is_defeated:
@@ -155,7 +162,12 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                             cmds = agent.decide_actions(game.state, game.handler)
                             for c in cmds:
                                 game.handler.queue_action(ai, c)
-                    
+
+                            # Capture reasoning logs from LLM agents
+                            if hasattr(agent, 'last_reasoning') and agent.last_reasoning:
+                                nation_name = game.state.nations[ai].name
+                                intent_logs.append(f"[INTENT] {nation_name}: {agent.last_reasoning}")
+
                     # Record state + actions before resolving
                     state_snapshot = {
                         "turn": game.state.turn,
@@ -166,13 +178,21 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                             "state": game.state.get_symbolic_state(nid),
                             "queued_actions": list(n.queued_actions)
                         }
-                    
+
                     with open("game_export.jsonl", "a") as f:
                         f.write(json.dumps(state_snapshot, cls=GameEncoder) + "\n")
-                    
-                    
+
                     # Resolve turn
                     logs = game.handler.resolve_simultaneous_turn()
+                    logs = intent_logs + logs
+
+                    # Feed events back to LLM agents for persistent memory
+                    current_turn = game.state.turn - 1  # turn was incremented during resolution
+                    for ai in ai_players:
+                        agent = game.agents.get(ai)
+                        if hasattr(agent, 'update_memory'):
+                            agent.update_memory(current_turn, logs)
+
                     success = True
                     msg = "Turn Resolved"
 

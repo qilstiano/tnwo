@@ -62,9 +62,25 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                     victory_type = "PEACE"
                 else:
                     winner_name = game.state.nations[winner_id].name
-                    victory_type = "DOMINATION" if game.state.turn < 150 else "SCORE"
+                    active_count = sum(1 for n in game.state.nations.values() if not n.is_defeated)
+                    victory_type = "DOMINATION" if active_count <= 1 else "SCORE"
 
             from ai.config import NATION_STRATEGIES
+
+            backends_info = {}
+            for nid in game.state.nations:
+                agent = game.agents.get(nid)
+                if hasattr(agent, 'backend_id') and agent.backend_id:
+                    backends_info[nid] = {
+                        "backend_id": agent.backend_id,
+                        "model": agent.model_name,
+                    }
+                else:
+                    backends_info[nid] = {
+                        "backend_id": "rulebased",
+                        "model": None,
+                    }
+
             state_dict = {
                 "turn": game.state.turn,
                 "current_player": game.state.current_player,
@@ -74,7 +90,8 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "ai_players": ai_players,
                 "nations": nations_dict,
                 "diplomacy": diplomacy_dict,
-                "strategies": NATION_STRATEGIES
+                "strategies": NATION_STRATEGIES,
+                "backends": backends_info,
             }
 
             response = json.dumps(state_dict, cls=GameEncoder)
@@ -168,16 +185,21 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
                                 nation_name = game.state.nations[ai].name
                                 intent_logs.append(f"[INTENT] {nation_name}: {agent.last_reasoning}")
 
-                    # Record state + actions before resolving
+                    # Record state + actions + backend metadata before resolving
                     state_snapshot = {
                         "turn": game.state.turn,
                         "agents": {}
                     }
                     for nid, n in game.state.nations.items():
-                        state_snapshot["agents"][nid] = {
+                        agent = game.agents.get(nid)
+                        agent_meta = {
                             "state": game.state.get_symbolic_state(nid),
-                            "queued_actions": list(n.queued_actions)
+                            "queued_actions": list(n.queued_actions),
                         }
+                        if hasattr(agent, 'backend_id') and agent.backend_id:
+                            agent_meta["backend_id"] = agent.backend_id
+                            agent_meta["model"] = agent.model_name
+                        state_snapshot["agents"][nid] = agent_meta
 
                     with open("game_export.jsonl", "a") as f:
                         f.write(json.dumps(state_snapshot, cls=GameEncoder) + "\n")
@@ -224,7 +246,7 @@ class GameRequestHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 PORT = 8080
+socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("", PORT), GameRequestHandler) as httpd:
-    httpd.allow_reuse_address = True
     print(f"Serving on http://localhost:{PORT}")
     httpd.serve_forever()

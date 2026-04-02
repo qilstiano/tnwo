@@ -6,7 +6,6 @@ from core.game_state import GameState
 from core.constants import Resource, DiplomaticState, Tech, Civic, TECH_COSTS, CIVIC_COSTS
 from engine.actions import ActionHandler
 from ai.agent import AIAgent
-from ai.llm_client import OllamaClient
 from ai.config import LLM_TEMPERATURE, MAX_RETRIES, STRATEGY_LIBRARY, NATION_STRATEGIES
 
 VALID_RESOURCES = {"GOLD", "MANPOWER", "PRODUCTION", "SCIENCE", "CIVICS"}
@@ -14,10 +13,13 @@ VALID_TECHS = {t.value for t in Tech}
 VALID_CIVICS = {c.value for c in Civic}
 
 class LLMAgent:
-    def __init__(self, player_id: int, client: OllamaClient, fallback: AIAgent):
+    def __init__(self, player_id: int, client, fallback: AIAgent,
+                 backend_id: str = "", model_name: str = ""):
         self.player_id = player_id
         self.client = client
         self.fallback = fallback
+        self.backend_id = backend_id
+        self.model_name = model_name
         self.last_reasoning = ""
         self.event_memory: list = []
 
@@ -156,14 +158,16 @@ Reply with ONLY this JSON, no other text:
 
         lines.append("")
         lines.append("OTHER NATIONS:")
-        for oid, onat in state.nations.items():
-            if oid == self.player_id or onat.is_defeated:
+        sym_state = state.get_symbolic_state(self.player_id)
+        for other in sym_state["other_nations"]:
+            if other["is_defeated"]:
                 continue
-            rel = state.get_diplomatic_state(self.player_id, oid)
-            grievance = nation.grievances.get(oid, 0)
-            lines.append(f"  Nation {oid} ({onat.name}): {rel.value} | "
-                          f"Gold={onat.gold} Mil={onat.military} Infra={onat.infrastructure_health}% | "
-                          f"Grievance={grievance}")
+            grievance = nation.grievances.get(other["id"], 0)
+            vs = other["visible_status"]
+            lines.append(f"  Nation {other['id']} ({other['name']}): {other['diplomatic_status']} | "
+                          f"Infra={vs['infrastructure_health']}% TechTier={vs['estimated_tech_tier']} "
+                          f"GlobalGrievances={vs['global_grievances']} | "
+                          f"MyGrievance={grievance}")
 
         if nation.pending_trade_agreements:
             lines.append(f"PENDING TRADE PROPOSALS FROM: {nation.pending_trade_agreements}")

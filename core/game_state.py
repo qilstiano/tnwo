@@ -1,6 +1,5 @@
 import random
 from typing import Dict, List, Optional
-from typing import Dict, Optional, List
 from .constants import Resource, DiplomaticState, TECH_COSTS, CIVIC_COSTS
 from .models import Nation, Achievements
 
@@ -64,22 +63,28 @@ class GameState:
             # Calculate modifiers
             prod_mod = 1.0
             if "Steam Power" in nation.unlocked_techs: prod_mod += 0.25
-            
+
             gold_mod = 1.0
             if nation.achievements.golden_age: gold_mod += 0.25
             gold_mod += (0.15 * len(nation.active_trade_agreements))
-            
+            if nation.gold > 2000:
+                nation.achievements.surplus_economy = True
+                gold_mod += 0.10
+
             sci_mod = 1.0
             sci_mod += (0.15 * len(nation.active_research_pacts))
-            
+            if len(nation.unlocked_techs) >= 3:
+                nation.achievements.university_network = True
+                sci_mod += 0.20
+
             manpower_mod = 1.0
             if nation.achievements.national_identity: manpower_mod += 0.20
             if nation.achievements.levies: manpower_mod += 0.10
-            
+
             # War exhaustion penalty to manpower
             manpower_mod -= (0.05 * nation.war_exhaustion)
             manpower_mod = max(0.1, manpower_mod) # heavily crippled but not backwards
-            
+
             # Base generation + Annexation yields
             nation.gold += int((nation.gold_yield + nation.absorbed_gold_yield) * gold_mod)
             nation.manpower += int(nation.manpower_yield * manpower_mod)
@@ -95,7 +100,7 @@ class GameState:
                 
             # Process Tech Native Currency Exchange
             if nation.current_tech:
-                cost = self.get_tech_cost(nation.current_tech)
+                cost = self.get_tech_cost(nation.current_tech, n_id)
                 if nation.science >= cost:
                     nation.science -= cost
                     nation.unlocked_techs.append(nation.current_tech)
@@ -137,22 +142,16 @@ class GameState:
               # Extra Achievements
             if nation.production_yield >= 500:
                 nation.achievements.industrial_heartland = True
-            if nation.gold > 2000:
-                nation.achievements.surplus_economy = True
-                gold_mod += 0.10
             if nation.manpower > 1500:
                 nation.achievements.standing_army = True
-            if len(nation.unlocked_techs) >= 3:
-                nation.achievements.university_network = True
-                sci_mod += 0.20
             if len(nation.unlocked_civics) >= 3 and not nation.achievements.bureaucracy:
                 nation.achievements.bureaucracy = True
                 nation.civic_yield = max(nation.civic_yield, int(nation.civic_yield * 1.2))
-    def get_tech_cost(self, tech_name: str) -> int:
+    def get_tech_cost(self, tech_name: str, nation_id: int = None) -> int:
         cost = TECH_COSTS.get(tech_name, 100)
-        # Check modifiers
-        for n in self.nations.values():
-            if tech_name == n.current_tech and n.achievements.scientific_method:
+        if nation_id is not None:
+            nation = self.nations.get(nation_id)
+            if nation and nation.achievements.scientific_method:
                 return int(cost * 0.85)
         return cost
 

@@ -14,9 +14,6 @@ class ActionHandler:
         nation = self.state.nations[player_id]
         if nation.is_defeated or len(nation.queued_actions) >= nation.max_action_points:
             return False
-        if nation.queued_actions and nation.is_defeated:
-            nation.queued_actions.clear()
-            return False
             
         parts = command.strip().split()
         cmd = parts[0].upper()

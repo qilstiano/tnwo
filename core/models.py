@@ -58,6 +58,7 @@ class Achievements:
     golden_age: bool = False
     bureaucracy: bool = False # New
     constitution: bool = False # New
+    surplus_economy: bool = False # New
 
 
 @dataclass

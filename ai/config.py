@@ -3,11 +3,43 @@ import os
 # Toggle: "llm" or "rulebased"
 AI_MODE = "llm"
 
-# Ollama settings (local)
+# Legacy single-backend settings (used as fallback when LLM_BACKENDS is empty)
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.1:8b"
 LLM_TEMPERATURE = 0.7
 MAX_RETRIES = 2
+
+# ---------------------------------------------------------------------------
+# Multi-backend configuration for LLM competition
+# Each pool is a distinct vLLM / Ollama endpoint serving a specific model.
+# Nations sharing a pool_id share the same underlying server + model.
+# ---------------------------------------------------------------------------
+LLM_BACKENDS = {
+    "server_1": {
+        "provider": "vllm",
+        "base_url": "http://localhost:8001",
+        "model": "Qwen/Qwen2.5-7B-Instruct",
+    },
+    "server_2": {
+        "provider": "vllm",
+        "base_url": "http://localhost:8002",
+        "model": "meta-llama/Llama-3.1-8B-Instruct",
+    },
+    "server_3": {
+        "provider": "vllm",
+        "base_url": "http://localhost:8003",
+        "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    },
+}
+
+# Map each nation_id -> pool_id in LLM_BACKENDS
+NATION_BACKEND_MAP = {
+    0: "server_1",
+    1: "server_1",
+    2: "server_2",
+    3: "server_2",
+    4: "server_3",
+}
 
 # Named strategy directives with priority actions
 # Each strategy represents a distinct theory of how to win:

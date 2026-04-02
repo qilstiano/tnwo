@@ -1,0 +1,5 @@
+# Base runtime dependency for the Python game engine.
+pydantic>=2,<3
+
+
+vllm>=0.18.1

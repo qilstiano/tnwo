@@ -1,5 +1,15 @@
 # Base runtime dependency for the Python game engine.
 pydantic>=2,<3
 
+# LoRA / SFT training stack used by train_lora_sft.py.
+transformers
+datasets
+peft
+trl
+accelerate
+
+# Optional: needed when using --load-in-4bit (QLoRA-style training).
+bitsandbytes
+
 
 # vllm>=0.18.1

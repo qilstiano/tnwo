@@ -8,6 +8,8 @@ import numpy as np
 from gymnasium import spaces
 
 from ai.agent import AIAgent
+from ai.llm_agent import LLMAgent
+from ai.llm_client import create_llm_client
 from core.game_state import GameState
 from engine.actions import ActionHandler
 from rl.action_space import build_action_catalog, build_action_mask, command_from_action
@@ -30,6 +32,10 @@ class NationEnv(gym.Env):
         annex_bonus: float = 20.0,
         invalid_action_penalty: float = -1.0,
         seed: Optional[int] = None,
+        opponent_mode: str = "rulebased",
+        opponent_backend: Optional[Dict[str, str]] = None,
+        nation_backends: Optional[Dict[int, Dict[str, str]]] = None,
+        nation_strategies: Optional[Dict[int, str]] = None,
     ):
         super().__init__()
         if learner_id >= num_players:
@@ -45,6 +51,10 @@ class NationEnv(gym.Env):
         self.annex_bonus = annex_bonus
         self.invalid_action_penalty = invalid_action_penalty
         self.base_seed = seed
+        self.opponent_mode = opponent_mode
+        self.opponent_backend = opponent_backend
+        self.nation_backends = nation_backends
+        self.nation_strategies = nation_strategies
 
         self.action_catalog = build_action_catalog(num_players)
         self.action_space = spaces.Discrete(len(self.action_catalog))
@@ -68,7 +78,7 @@ class NationEnv(gym.Env):
 
         self.state: Optional[GameState] = None
         self.handler: Optional[ActionHandler] = None
-        self.opponents: Dict[int, AIAgent] = {}
+        self.opponents: Dict[int, Any] = {}
         self.current_action_slots = [-1, -1, -1]
         self.prev_score = 0
         self.last_logs: List[str] = []
@@ -88,11 +98,7 @@ class NationEnv(gym.Env):
 
         self.state = GameState(self.num_players)
         self.handler = ActionHandler(self.state)
-        self.opponents = {
-            nation_id: AIAgent(nation_id)
-            for nation_id in range(self.num_players)
-            if nation_id != self.learner_id
-        }
+        self.opponents = self._build_opponents()
         self.current_action_slots = [-1, -1, -1]
         self.prev_score = compute_score(self.state, self.learner_id)
         self.last_logs = []
@@ -204,7 +210,56 @@ class NationEnv(gym.Env):
                 self.handler.queue_action(opponent_id, command)
 
         self.last_logs = self.handler.resolve_simultaneous_turn()
+
+        if self.opponent_mode == "llm":
+            for opponent in self.opponents.values():
+                if isinstance(opponent, LLMAgent):
+                    opponent.update_memory(
+                        self.state.turn, self.last_logs, self.state
+                    )
+
         return list(self.last_logs)
+
+    def _build_opponents(self) -> Dict[int, Any]:
+        opponent_ids = [
+            nid for nid in range(self.num_players) if nid != self.learner_id
+        ]
+
+        if self.opponent_mode != "llm":
+            return {nid: AIAgent(nid) for nid in opponent_ids}
+
+        from ai.config import NATION_STRATEGIES as DEFAULT_STRATEGIES
+
+        strategies = self.nation_strategies or DEFAULT_STRATEGIES
+        opponents: Dict[int, Any] = {}
+
+        for nid in opponent_ids:
+            fallback = AIAgent(nid)
+
+            backend_cfg = None
+            if self.nation_backends and nid in self.nation_backends:
+                backend_cfg = self.nation_backends[nid]
+            elif self.opponent_backend:
+                backend_cfg = self.opponent_backend
+
+            if backend_cfg is None:
+                opponents[nid] = fallback
+                continue
+
+            client = create_llm_client(
+                provider=backend_cfg["provider"],
+                base_url=backend_cfg["base_url"],
+                model=backend_cfg["model"],
+            )
+            opponents[nid] = LLMAgent(
+                player_id=nid,
+                client=client,
+                fallback=fallback,
+                backend_id=backend_cfg.get("backend_id", ""),
+                model_name=backend_cfg["model"],
+            )
+
+        return opponents
 
     def _fallback_action_id(self) -> int:
         if self.state is None:

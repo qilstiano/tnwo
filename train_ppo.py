@@ -52,6 +52,19 @@ def parse_args():
     parser.add_argument("--checkpoint-freq", type=int, default=20000,
                         help="Save a checkpoint every N timesteps")
     parser.add_argument("--tensorboard-log", default=None, help="Optional tensorboard log dir")
+
+    # LLM opponent configuration
+    parser.add_argument("--opponent-mode", choices=["rulebased", "llm"], default="rulebased",
+                        help="Opponent type: rulebased (AIAgent) or llm (LLMAgent)")
+    parser.add_argument("--opponent-provider", default="vllm",
+                        help="LLM provider for all opponents (vllm or ollama)")
+    parser.add_argument("--opponent-base-url", default="http://localhost:8001",
+                        help="Base URL for the shared opponent LLM backend")
+    parser.add_argument("--opponent-model", default="Qwen/Qwen2.5-7B-Instruct",
+                        help="Model name for the shared opponent LLM backend")
+    parser.add_argument("--nation-backends-json", default=None,
+                        help="Optional JSON file mapping nation_id -> {provider, base_url, model} "
+                             "for per-nation backend overrides")
     return parser.parse_args()
 
 
@@ -160,6 +173,20 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Build opponent backend config
+    opponent_backend = None
+    nation_backends = None
+    if args.opponent_mode == "llm":
+        opponent_backend = {
+            "provider": args.opponent_provider,
+            "base_url": args.opponent_base_url,
+            "model": args.opponent_model,
+        }
+        if args.nation_backends_json:
+            with open(args.nation_backends_json, "r") as f:
+                raw = json.load(f)
+            nation_backends = {int(k): v for k, v in raw.items()}
+
     base_env = NationEnv(
         num_players=args.num_players,
         learner_id=args.learner_id,
@@ -171,6 +198,9 @@ def main():
         annex_bonus=args.annex_bonus,
         invalid_action_penalty=args.invalid_action_penalty,
         seed=args.seed,
+        opponent_mode=args.opponent_mode,
+        opponent_backend=opponent_backend,
+        nation_backends=nation_backends,
     )
     env = ActionMasker(base_env, mask_fn)
 
@@ -214,7 +244,11 @@ def main():
         print_every=10,
     )
 
+    opponent_desc = "rulebased"
+    if args.opponent_mode == "llm":
+        opponent_desc = f"llm ({args.opponent_model} @ {args.opponent_base_url})"
     print(f"Training PPO | timesteps={args.total_timesteps} | obs_dim={base_env.observation_space.shape[0]} | act_dim={base_env.action_space.n}")
+    print(f"Opponents: {opponent_desc}")
     print(f"Checkpoints -> {output_dir / 'checkpoints'}")
     print(f"Training curve -> {output_dir / 'training_curve.csv'}")
     print(f"Tensorboard -> {tb_log}")
@@ -250,6 +284,10 @@ def main():
         "invalid_action_penalty": args.invalid_action_penalty,
         "policy_hidden_size": args.policy_hidden_size,
         "checkpoint_freq": args.checkpoint_freq,
+        "opponent_mode": args.opponent_mode,
+        "opponent_provider": args.opponent_provider if args.opponent_mode == "llm" else None,
+        "opponent_base_url": args.opponent_base_url if args.opponent_mode == "llm" else None,
+        "opponent_model": args.opponent_model if args.opponent_mode == "llm" else None,
         "observation_dim": int(base_env.observation_space.shape[0]),
         "action_dim": int(base_env.action_space.n),
         "episodes_trained": curve_cb.episode_count,

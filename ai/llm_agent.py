@@ -22,6 +22,7 @@ class LLMAgent:
         self.model_name = model_name
         self.last_reasoning = ""
         self.event_memory: list = []
+        self.archived_event_summaries: dict = {}
 
     def decide_actions(self, state: GameState, handler: ActionHandler) -> List[str]:
         nation = state.nations[self.player_id]
@@ -40,56 +41,205 @@ class LLMAgent:
     # Events that matter for long-term memory (wars, alliances, deaths, betrayals)
     SIGNIFICANT_KEYWORDS = [
         "WAR!", "declared war", "FALLEN", "Alliance", "annexed",
-        "INTENT", "struck", "Trade Agreement", "Research Pact",
+        "struck", "Trade Agreement", "Research Pact",
         "SABOTAGE", "SKIRMISH", "CANCEL", "JOINT WAR",
-        "Peace", "Victory", "PARIAH",
+        "Peace", "Victory", "PARIAH", "BETRAYAL", "BORDER CONFLICT",
+        "SHADOW WAR", "proposed an Alliance", "proposed a Trade Agreement",
+        "proposed a Research Pact", "requested",
     ]
 
-    def update_memory(self, turn: int, events: List[str]):
-        significant = []
-        routine = []
+    VISIBLE_EVENT_KEYWORDS = [
+        "proposed an Alliance",
+        "proposed a Trade Agreement",
+        "proposed a Research Pact",
+        "requested",
+        "formed an Alliance",
+        "signed a Trade Agreement",
+        "signed a Research Pact",
+        "declared war",
+        "WAR!",
+        "JOINT WAR",
+        "struck",
+        "sabotaged",
+        "skirmished",
+        "raided",
+        "BETRAYAL",
+        "SHADOW WAR",
+        "BORDER CONFLICT",
+        "HAS FALLEN",
+        "annexed",
+    ]
+
+    def update_memory(self, turn: int, events: List[str], state: Optional[GameState] = None):
+        if state is None or self.player_id not in state.nations:
+            return
+
+        my_name = state.nations[self.player_id].name
         for event in events:
-            tagged = f"Turn {turn}: {event}"
-            if any(kw in event for kw in self.SIGNIFICANT_KEYWORDS):
-                significant.append(tagged)
-            else:
-                routine.append(tagged)
-        for s in significant:
-            self.event_memory.append(("significant", s))
-        for r in routine:
-            self.event_memory.append(("routine", r))
+            if not self._is_visible_event(event, my_name):
+                continue
+
+            self.event_memory.append({
+                "turn": turn,
+                "text": event,
+                "is_significant": any(kw in event for kw in self.SIGNIFICANT_KEYWORDS),
+            })
+
+        self._compact_memory(turn, my_name)
 
     def clear_memory(self):
         self.event_memory.clear()
+        self.archived_event_summaries.clear()
+
+    def _is_visible_event(self, event: str, my_name: str) -> bool:
+        if event.startswith("[INTENT]"):
+            return False
+        if my_name not in event:
+            return False
+        return any(keyword in event for keyword in self.VISIBLE_EVENT_KEYWORDS)
+
+    def _compact_memory(self, current_turn: int, my_name: str, recent_turns: int = 5):
+        cutoff = current_turn - recent_turns
+        kept_recent = []
+
+        for entry in self.event_memory:
+            if entry["turn"] >= cutoff:
+                kept_recent.append(entry)
+                continue
+
+            if not entry["is_significant"]:
+                continue
+
+            summary = self._summarize_event(entry["text"], my_name)
+            bucket = self.archived_event_summaries.setdefault(
+                summary,
+                {"count": 0, "last_turn": entry["turn"]},
+            )
+            bucket["count"] += 1
+            bucket["last_turn"] = max(bucket["last_turn"], entry["turn"])
+
+        self.event_memory = kept_recent
+
+    def _summarize_event(self, event: str, my_name: str) -> str:
+        patterns = [
+            (r"WAR! (.+) declared war on (.+)!", "war"),
+            (r"(.+) proposed an Alliance to (.+)\.", "alliance_proposal"),
+            (r"(.+) proposed a Trade Agreement to (.+)\.", "trade_proposal"),
+            (r"(.+) proposed a Research Pact to (.+)\.", "research_proposal"),
+            (r"(.+) and (.+) formed an Alliance!.*", "alliance_formed"),
+            (r"(.+) and (.+) signed a Trade Agreement.*", "trade_signed"),
+            (r"(.+) and (.+) signed a Research Pact.*", "research_signed"),
+            (r"JOINT WAR: (.+) answered (.+)'s call and declared war on (.+)!", "joint_war"),
+            (r"(.+) struck (.+)!.*", "strike"),
+            (r"\*\*\* (.+) HAS FALLEN! (.+) annexed.*", "fallen"),
+            (r"BETRAYAL: (.+) broke their Alliance with (.+)!", "alliance_broken"),
+            (r"BETRAYAL: (.+) sabotaged their ally (.+)!.*", "ally_sabotage"),
+            (r"SHADOW WAR: (.+) sabotaged (.+)'s industry.*", "sabotage"),
+            (r"BETRAYAL: (.+) raided their ally (.+)'s border!.*", "ally_skirmish"),
+            (r"BORDER CONFLICT: (.+)'s forces skirmished with (.+)!.*", "skirmish"),
+            (r"(.+) requested (.+) to join them in a war against (.+)!", "joint_war_request"),
+        ]
+
+        for pattern, kind in patterns:
+            match = re.match(pattern, event)
+            if not match:
+                continue
+
+            parties = match.groups()
+            if kind == "war":
+                attacker, target = parties
+                if attacker == my_name:
+                    return f"You declared war on {target}."
+                if target == my_name:
+                    return f"{attacker} declared war on you."
+            elif kind in {"alliance_proposal", "trade_proposal", "research_proposal"}:
+                proposer, target = parties
+                label = {
+                    "alliance_proposal": "Alliance",
+                    "trade_proposal": "Trade Agreement",
+                    "research_proposal": "Research Pact",
+                }[kind]
+                if proposer == my_name:
+                    return f"You proposed a {label} to {target}."
+                if target == my_name:
+                    return f"{proposer} proposed a {label} to you."
+            elif kind in {"alliance_formed", "trade_signed", "research_signed"}:
+                left, right = parties
+                counterpart = right if left == my_name else left
+                label = {
+                    "alliance_formed": "Alliance",
+                    "trade_signed": "Trade Agreement",
+                    "research_signed": "Research Pact",
+                }[kind]
+                return f"You and {counterpart} completed a {label}."
+            elif kind == "joint_war":
+                ally, proposer, enemy = parties
+                if ally == my_name:
+                    return f"You joined {proposer}'s war against {enemy}."
+                if proposer == my_name:
+                    return f"{ally} joined your war against {enemy}."
+            elif kind == "strike":
+                attacker, target = parties
+                if attacker == my_name:
+                    return f"You struck {target}."
+                if target == my_name:
+                    return f"{attacker} struck you."
+            elif kind == "fallen":
+                fallen, killer = parties
+                if fallen == my_name:
+                    return f"You were defeated by {killer}."
+                if killer == my_name:
+                    return f"You annexed {fallen}."
+            elif kind == "alliance_broken":
+                breaker, target = parties
+                if breaker == my_name:
+                    return f"You broke your Alliance with {target}."
+                if target == my_name:
+                    return f"{breaker} broke their Alliance with you."
+            elif kind in {"ally_sabotage", "sabotage"}:
+                attacker, target = parties
+                if attacker == my_name:
+                    return f"You sabotaged {target}."
+                if target == my_name:
+                    return f"{attacker} sabotaged you."
+            elif kind in {"ally_skirmish", "skirmish"}:
+                attacker, target = parties
+                if attacker == my_name:
+                    return f"You skirmished with {target}."
+                if target == my_name:
+                    return f"{attacker} skirmished with you."
+            elif kind == "joint_war_request":
+                proposer, target, enemy = parties
+                if proposer == my_name:
+                    return f"You asked {target} to join a war against {enemy}."
+                if target == my_name:
+                    return f"{proposer} asked you to join a war against {enemy}."
+
+        return "A relevant diplomatic or military event involved you."
 
     def get_history_prompt(self, current_turn: int, recent_turns: int = 5) -> List[str]:
-        # Build event history: summarise past significant events + keep recent events in full
+        # Build event history: use archived summaries for older events and keep
+        # only recent visible events verbatim.
         cutoff = current_turn - recent_turns
-        summary_events = []
-        recent_events = []
-
-        for event_type, text in self.event_memory:
-            try:
-                turn_num = int(text.split(":")[0].replace("Turn ", ""))
-            except (ValueError, IndexError):
-                turn_num = 0
-
-            if turn_num >= cutoff:
-                # Recent: include everything
-                recent_events.append(text)
-            elif event_type == "significant":
-                # Old: only significant events
-                summary_events.append(text)
+        recent_events = [e for e in self.event_memory if e["turn"] >= cutoff]
 
         lines = []
-        if summary_events:
-            lines.append("KEY PAST EVENTS:")
-            for s in summary_events:
-                lines.append(f"  - {s}")
+        if self.archived_event_summaries:
+            lines.append("OLDER STRATEGIC MEMORY:")
+            summary_items = sorted(
+                self.archived_event_summaries.items(),
+                key=lambda item: item[1]["last_turn"],
+                reverse=True,
+            )
+            for summary, meta in summary_items[:8]:
+                if meta["count"] > 1:
+                    lines.append(f"  - {summary} (x{meta['count']}, last turn {meta['last_turn']})")
+                else:
+                    lines.append(f"  - {summary} (turn {meta['last_turn']})")
         if recent_events:
-            lines.append(f"RECENT EVENTS (last {recent_turns} turns):")
-            for r in recent_events:
-                lines.append(f"  - {r}")
+            lines.append(f"RECENT VISIBLE EVENTS (last {recent_turns} turns):")
+            for entry in recent_events[-8:]:
+                lines.append(f"  - Turn {entry['turn']}: {entry['text']}")
         return lines
 
     # Prompt Engineering
@@ -131,58 +281,70 @@ Reply with ONLY this JSON, no other text:
         lines = []
 
         lines.append(f"TURN {state.turn}")
-        lines.append(f"YOUR RESOURCES: Gold={nation.gold}, Manpower={nation.manpower}, "
-                      f"Production={nation.production}, Science={nation.science}, Civics={nation.civics}")
-        lines.append(f"MILITARY: {nation.military} | INFRASTRUCTURE: {nation.infrastructure_health}% | "
-                      f"WAR_EXHAUSTION: {nation.war_exhaustion}")
-        lines.append(f"YIELDS/TURN: Gold={nation.gold_yield}, Manpower={nation.manpower_yield}, "
-                      f"Production={nation.production_yield}")
-        lines.append(f"TECHS UNLOCKED: {nation.unlocked_techs or 'None'}")
-        lines.append(f"CIVICS UNLOCKED: {nation.unlocked_civics or 'None'}")
+        lines.append("Use only the current state snapshot below. Do not assume access to hidden past actions or intent logs.")
+        lines.append("")
+        lines.append(f"YOU ARE: Nation {nation.id} ({nation.name})")
+        lines.append("")
+        lines.append("GLOBAL STATE SNAPSHOT AFTER THE PREVIOUS TURN:")
 
-        if nation.current_tech:
-            cost = TECH_COSTS.get(nation.current_tech, 100)
-            lines.append(f"RESEARCHING: {nation.current_tech} (progress: {nation.tech_progress}/{cost})")
-        else:
-            available = [t.value for t in Tech if t.value not in nation.unlocked_techs]
-            if available:
-                lines.append(f"AVAILABLE TECHS: {', '.join(available)}")
-
-        if nation.current_civic:
-            cost = CIVIC_COSTS.get(nation.current_civic, 100)
-            lines.append(f"PURSUING CIVIC: {nation.current_civic} (progress: {nation.civic_progress}/{cost})")
-        else:
-            available = [c.value for c in Civic if c.value not in nation.unlocked_civics]
-            if available:
-                lines.append(f"AVAILABLE CIVICS: {', '.join(available)}")
+        for other_id in sorted(state.nations):
+            other = state.nations[other_id]
+            lines.append("")
+            lines.append(f"NATION {other.id}: {other.name}")
+            lines.append(f"  STATUS: {'DEFEATED' if other.is_defeated else 'ALIVE'}")
+            lines.append(
+                f"  RESOURCES: Gold={other.gold}, Manpower={other.manpower}, "
+                f"Production={other.production}, Science={other.science}, Civics={other.civics}"
+            )
+            lines.append(
+                f"  MILITARY: {other.military} | INFRASTRUCTURE: {other.infrastructure_health}% | "
+                f"WAR_EXHAUSTION: {other.war_exhaustion}"
+            )
+            lines.append(
+                f"  YIELDS/TURN: Gold={other.gold_yield + other.absorbed_gold_yield}, "
+                f"Manpower={other.manpower_yield}, "
+                f"Production={other.production_yield + other.absorbed_prod_yield}, "
+                f"Science={other.science_yield + other.absorbed_sci_yield}, "
+                f"Civics={other.civic_yield}"
+            )
+            lines.append(f"  TECHS UNLOCKED: {other.unlocked_techs or 'None'}")
+            lines.append(f"  CIVICS UNLOCKED: {other.unlocked_civics or 'None'}")
+            if other.current_tech:
+                cost = TECH_COSTS.get(other.current_tech, 100)
+                lines.append(f"  RESEARCHING: {other.current_tech} (progress: {other.tech_progress}/{cost})")
+            if other.current_civic:
+                cost = CIVIC_COSTS.get(other.current_civic, 100)
+                lines.append(f"  PURSUING CIVIC: {other.current_civic} (progress: {other.civic_progress}/{cost})")
+            if other.pending_trade_agreements:
+                lines.append(f"  PENDING TRADE PROPOSALS FROM: {other.pending_trade_agreements}")
+            if other.pending_research_pacts:
+                lines.append(f"  PENDING RESEARCH PROPOSALS FROM: {other.pending_research_pacts}")
+            if other.pending_joint_wars:
+                lines.append(f"  PENDING JOINT WAR PROPOSALS: {other.pending_joint_wars}")
+            pending_alliances = [
+                oid for oid, relation in state.diplomacy[other.id].items()
+                if relation == DiplomaticState.ALLIANCE_PENDING and oid != other.id
+            ]
+            if pending_alliances:
+                lines.append(f"  PENDING ALLIANCE PROPOSALS FROM: {pending_alliances}")
 
         lines.append("")
-        lines.append("OTHER NATIONS:")
-        sym_state = state.get_symbolic_state(self.player_id)
-        for other in sym_state["other_nations"]:
-            if other["is_defeated"]:
-                continue
-            grievance = nation.grievances.get(other["id"], 0)
-            vs = other["visible_status"]
-            lines.append(f"  Nation {other['id']} ({other['name']}): {other['diplomatic_status']} | "
-                          f"Infra={vs['infrastructure_health']}% TechTier={vs['estimated_tech_tier']} "
-                          f"GlobalGrievances={vs['global_grievances']} | "
-                          f"MyGrievance={grievance}")
+        lines.append("GLOBAL DIPLOMACY:")
+        alive_ids = [nid for nid, other in state.nations.items() if not other.is_defeated]
+        for i, left_id in enumerate(alive_ids):
+            for right_id in alive_ids[i + 1:]:
+                relation = state.get_diplomatic_state(left_id, right_id)
+                left_name = state.nations[left_id].name
+                right_name = state.nations[right_id].name
+                lines.append(f"  {left_name} <-> {right_name}: {relation.value}")
 
-        if nation.pending_trade_agreements:
-            lines.append(f"PENDING TRADE PROPOSALS FROM: {nation.pending_trade_agreements}")
-        if nation.pending_research_pacts:
-            lines.append(f"PENDING RESEARCH PROPOSALS FROM: {nation.pending_research_pacts}")
-
-        pending_alliances = [oid for oid, s in state.diplomacy[self.player_id].items()
-                             if s == DiplomaticState.ALLIANCE_PENDING and oid != self.player_id]
-        if pending_alliances:
-            lines.append(f"PENDING ALLIANCE PROPOSALS FROM: {pending_alliances}")
-
-        history_lines = self.get_history_prompt(state.turn)
-        if history_lines:
-            lines.append("")
-            lines.extend(history_lines)
+        lines.append("")
+        available_techs = [t.value for t in Tech if t.value not in nation.unlocked_techs]
+        available_civics = [c.value for c in Civic if c.value not in nation.unlocked_civics]
+        if not nation.current_tech and available_techs:
+            lines.append(f"YOUR AVAILABLE TECHS: {', '.join(available_techs)}")
+        if not nation.current_civic and available_civics:
+            lines.append(f"YOUR AVAILABLE CIVICS: {', '.join(available_civics)}")
 
         return "\n".join(lines)
 

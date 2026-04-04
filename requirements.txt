@@ -8,6 +8,12 @@ peft
 trl
 accelerate
 
+# RL stack used by train_ppo.py and evaluate_ppo.py.
+numpy
+gymnasium
+stable-baselines3
+sb3-contrib
+
 # Optional: needed when using --load-in-4bit (QLoRA-style training).
 bitsandbytes
 

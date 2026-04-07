@@ -1,0 +1,39 @@
+{
+  "seed": 42,
+  "num_players": 5,
+  "max_turns": 100,
+  "temperature": 0.7,
+  "turns_played": 43,
+  "total_time_seconds": 61.76,
+  "winner": 4,
+  "victory_type": "DOMINATION",
+  "scores": {
+    "0": 513,
+    "1": 1551,
+    "2": 1630,
+    "3": 1855,
+    "4": 6962
+  },
+  "nation_models": {
+    "0": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "1": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "2": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "3": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "4": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    }
+  }
+}

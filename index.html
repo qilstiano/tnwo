@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>twno-frontend</title>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Serif:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0d0f10 0%, #15181a 100%);
+            font-family: 'PT Serif', serif;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* TOP SETTINGS BAR */
+        .top-nav {
+            height: 50px;
+            background: rgba(10, 10, 10, 0.98);
+            border-bottom: 2px solid #d85c36;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            font-family: 'PT Sans', sans-serif;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .nav-title {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #ecc987;
+            text-transform: uppercase;
+        }
+
+        .nav-settings {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 13px;
+            color: #ccc;
+        }
+
+        .nav-settings select,
+        .nav-settings input {
+            background: #222;
+            color: #fff;
+            border: 1px solid #d85c36;
+            padding: 4px;
+            font-family: 'PT Sans', sans-serif;
+            outline: none;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: #d85c36;
+            border: 1px solid #d85c36;
+            padding: 5px 15px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 13px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: #d85c36;
+            color: #000;
+        }
+
+        .export-btn {
+            border-color: #6bb093;
+            color: #6bb093;
+        }
+
+        .export-btn:hover {
+            background: #6bb093;
+            color: #000;
+        }
+
+        .app-container {
+            display: flex;
+            flex: 1;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* LEFT PANEL: Portraits & Diplo Tab */
+        .left-panel {
+            width: 25%;
+            min-width: 320px;
+            background: rgba(10, 10, 10, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: inset -20px 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-heading {
+            font-family: 'PT Sans', sans-serif;
+            font-size: 14px;
+            color: #d85c36;
+            text-transform: uppercase;
+            border-bottom: 2px solid rgba(216, 92, 54, 0.3);
+            margin: 0 0 15px 0;
+            padding-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        #party-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
+            gap: 10px;
+            align-content: flex-start;
+            overflow-y: auto;
+            max-height: 50%;
+            margin-bottom: 10px;
+        }
+
+        .portrait-frame {
+            position: relative;
+            background: #2a2a2a;
+            border: 3px solid #f2f2f2;
+            width: 100%;
+            aspect-ratio: 3/4;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .portrait-frame:hover {
+            transform: translateY(-3px);
+            border-color: #d85c36;
+        }
+
+        .portrait-frame.defeated {
+            filter: grayscale(1) invert(0.2);
+            opacity: 0.5;
+        }
+
+        .failed-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            color: #ff3333;
+            border: 3px solid #ff3333;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.85);
+            white-space: nowrap;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 50, 50, 0.5);
+        }
+
+        .portrait {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .portrait-stats {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.85);
+            font-family: 'PT Sans', sans-serif;
+            font-size: 10px;
+            padding: 3px;
+            text-align: center;
+            border-top: 1px solid #d85c36;
+        }
+
+        .nation-title {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            color: white;
+            font-size: 9px;
+            font-weight: bold;
+            padding: 3px;
+            text-align: center;
+            font-family: 'PT Sans', sans-serif;
+            text-transform: uppercase;
+        }
+
+        /* Diplo Tracker Box */
+        #diplo-tab {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .diplo-block {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.1);
+        }
+
+        .diplo-nation {
+            color: #ecc987;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .diplo-rel {
+            font-size: 13px;
+            margin-left: 10px;
+        }
+
+        .rel-war {
+            color: #ff5555;
+        }
+
+        .rel-pact {
+            color: #6bb093;
+        }
+
+        /* MIDDLE PANEL: Ledger (World State) */
+        .middle-panel {
+            flex: 1;
+            padding: 40px;
+            background: rgba(15, 18, 20, 0.4);
+            overflow-y: auto;
+            border-right: 2px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #ledger-panel {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .ledger-title {
+            font-size: 28px;
+            color: #d85c36;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(216, 92, 54, 0.5);
+            padding-bottom: 15px;
+            letter-spacing: 2px;
+        }
+
+        #ledger-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .ledger-item {
+            background: rgba(18, 18, 18, 0.85);
+            border-left: 5px solid #d85c36;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .ledger-name {
+            font-weight: bold;
+            font-size: 18px;
+            color: #ecc987;
+            text-transform: uppercase;
+        }
+
+        .ledger-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            color: #e0e0e0;
+            font-size: 15px;
+            border-bottom: 1px dotted rgba(255, 255, 255, 0.05);
+            padding-bottom: 4px;
+        }
+
+        .ledger-row span:last-child {
+            font-weight: bold;
+        }
+
+        /* RIGHT PANEL: Dialogue / Chronology */
+        .right-panel {
+            width: 35%;
+            min-width: 400px;
+            background: linear-gradient(90deg, rgba(20, 20, 20, 0.95) 0%, rgba(10, 10, 10, 0.98) 100%);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.9);
+        }
+
+        #log-scroll {
+            flex: 1;
+            padding: 40px 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(216, 92, 54, 0.5);
+        }
+
+        .log-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'PT Sans', sans-serif;
+            font-weight: bold;
+            color: #6bb093;
+            width: 90px;
+            flex-shrink: 0;
+            text-align: right;
+            text-transform: uppercase;
+            font-size: 14px;
+            padding-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .speaker.system {
+            color: #d85c36;
+        }
+
+        .speaker.global {
+            color: #ecc987;
+            width: auto;
+            text-align: left;
+        }
+
+        .line-text {
+            font-size: 20px;
+            color: #e8e8e8;
+            line-height: 1.5;
+        }
+
+        .line-text.war-text {
+            color: #d85c36;
+        }
+
+        .line-text.muted {
+            color: #777;
+            font-size: 16px;
+            font-style: italic;
+        }
+
+        #dialogue-options {
+            padding: 30px 40px;
+            background: rgba(0, 0, 0, 0.7);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'PT Sans', sans-serif;
+        }
+
+        .option-btn {
+            background: transparent;
+            border: none;
+            color: #d85c36;
+            font-size: 17px;
+            text-align: left;
+            padding: 12px 0;
+            cursor: pointer;
+            transition: color 0.1s, text-shadow 0.1s;
+            display: block;
+            width: 100%;
+        }
+
+        .option-btn:hover {
+            color: #fff;
+            text-shadow: 0 0 8px #d85c36;
+        }
+
+        .option-btn::before {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="top-nav">
+        <div class="nav-title" style="display:flex; align-items:center;">
+            The Simulacrum
+            <div style="margin-left: 20px; color: #6bb093; font-size: 14px; letter-spacing: 1px;">
+                EPOCH: <span id="top-turn-counter" style="color: #fff;">1</span>
+            </div>
+        </div>
+        <div class="nav-settings">
+            <button class="option-btn"
+                style="color:#6bb093; text-align:center; flex:0; white-space:nowrap; padding: 10px 20px; border: 1px solid #6bb093; border-radius: 5px; font-size: 14px;"
+                id="btn-auto"><strong>▶ START AUTOPLAY</strong></button>
+            <label>Mode:</label>
+            <select id="sim-mode">
+                <option value="EvE">CPU vs CPU</option>
+                <option value="PvE">Player vs CPU</option>
+            </select>
+            <label>Nations Bound:</label>
+            <input type="number" id="sim-num" value="5" min="2" max="15">
+            <button class="nav-btn" id="btn-reset">Reinitialize World</button>
+            <a class="nav-btn export-btn" href="/api/export">Export Agent Logs (JSONL)</a>
+        </div>
+    </div>
+
+    <div class="app-container">
+
+        <!-- LEFT PANEL -->
+        <div class="left-panel">
+            <h2 class="panel-heading">The Sovereigns</h2>
+            <div id="party-container"></div>
+
+            <div style="margin-top: 15px; display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <h2 class="panel-heading">Geopolitical Web</h2>
+                <div id="diplo-tab">
+                    <div style="color:#666; font-style:italic;">Awaiting data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE PANEL -->
+        <div class="middle-panel">
+            <div id="ledger-panel">
+                <div class="ledger-title" id="ledger-turn">World State</div>
+                <div id="ledger-content">
+                    <div style="text-align:center; color:#888; padding:50px;">Establishing neural link...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="right-panel" id="dialogue-panel">
+            <div id="log-scroll">
+                <div class="log-line">
+                    <div class="speaker system">SYSTEM</div>
+                    <div class="line-text">The world awakens.</div>
+                </div>
+                <div class="log-line">
+                    <div class="speaker system">SYSTEM</div>
+                    <div class="line-text" style="color:#d88636;">The geopolitical cogs are in place.
+                        War and pacts await. </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const partyContainer = document.getElementById('party-container');
+        const diploTab = document.getElementById('diplo-tab');
+        const ledgerContent = document.getElementById('ledger-content');
+        const ledgerTurn = document.getElementById('ledger-turn');
+        const logScroll = document.getElementById('log-scroll');
+        const btnNext = document.getElementById('btn-next');
+        const btnAuto = document.getElementById('btn-auto');
+        const btnReset = document.getElementById('btn-reset');
+
+        const portraitsList = [
+            '6zSCXzQ.jpeg', '8GUrAMA.jpeg', 'HuTvKDq.jpeg', 'KFJFuXi.jpeg',
+            'NlpR4WE.jpeg', 'UTQPgP5.jpeg', 'XBg6eEh.jpeg', 'dJNDrxx.jpeg',
+            'nMnfor6.jpeg', 'oC9z1Ou.jpeg', 'phQLt7O.jpeg', 'ySbgVFy.jpeg'
+        ];
+
+        let isAutoplaying = false;
+        let lastState = null;
+        let autoInterval = null;
+
+        // Randomize portrait rotation every reset
+        let portraitOffset = 0;
+
+        function assignPortrait(id) {
+            const index = (id * 7 + 3 + portraitOffset) % portraitsList.length;
+            return `/misc/portraits/${portraitsList[index]}`;
+        }
+
+        function pushLog(speaker, text, type = '') {
+            const row = document.createElement('div');
+            row.className = 'log-line';
+
+            let extraClass = '';
+            if (text.includes('WAR!') || text.includes('FALLEN') || text.includes('struck')) {
+                extraClass = 'war-text';
+                type = 'system';
+            }
+
+            row.innerHTML = `
+            <div class="speaker ${type}">${speaker}</div>
+            <div class="line-text ${extraClass}">${text}</div>
+        `;
+            logScroll.appendChild(row);
+
+            logScroll.scrollTo({
+                top: logScroll.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        async function fetchState() {
+            try {
+                const res = await fetch('/api/state').catch(() => fetch('http://localhost:8080/api/state'));
+                const state = await res.json();
+                renderUI(state);
+            } catch (e) { }
+        }
+
+        function renderUI(state) {
+            lastState = state;
+            ledgerTurn.textContent = "World State (Epoch " + state.turn + ")";
+            const topCounter = document.getElementById('top-turn-counter');
+            if (topCounter) topCounter.textContent = state.turn;
+
+            const nations = Object.values(state.nations).sort((a, b) => a.id - b.id);
+
+            const archIcons = {
+                "WARMONGER": "⚔️",
+                "TECHNOCRAT": "🔬",
+                "BALANCED": "⚖️",
+                "OPPORTUNIST": "🐍"
+            };
+            const archColors = {
+                "WARMONGER": "#931718",
+                "TECHNOCRAT": "#06b6d4",
+                "BALANCED": "#6bb093",
+                "OPPORTUNIST": "#8b5cf6"
+            };
+
+            // 1. Render Portraits
+            let partyHtml = '';
+            const strategyLabels = {
+                "neutral": "🔘 NEUTRAL",
+                "expansionist": "⚔️ EXPANSIONIST",
+                "scientific": "🔬 SCIENTIFIC",
+                "mercantile": "💰 MERCANTILE",
+                "diplomatic": "🕊️ DIPLOMATIC"
+            };
+            nations.forEach(n => {
+                const img = assignPortrait(n.id);
+                const color = archColors[n.personality] || n.color;
+                const icon = archIcons[n.personality] || "🏳️";
+                const strategy = state.strategies && state.strategies[n.id] ? state.strategies[n.id] : "";
+                const stratLabel = strategyLabels[strategy] || "";
+                partyHtml += `
+            <div class="portrait-frame ${n.is_defeated ? 'defeated' : ''}" title="${n.name}\n${n.personality}\nStrategy: ${strategy}" style="border-color:${color};">
+                <div class="nation-title" style="background:${color}; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${icon} ${n.name} <div style="font-size:7px; opacity:0.8; font-weight:normal;">${n.personality}${stratLabel ? ' · ' + stratLabel : ''}</div></div>
+                <img class="portrait" src="${img}" alt="${n.name}">
+                ${n.is_defeated ? '<div class="failed-stamp">FAILED STATE</div>' : ''}
+                <div class="portrait-stats">
+                    ⚔️${n.military}  💰${n.gold} <br>🏗️ ${n.infrastructure_health}%
+                </div>
+            </div>`;
+            });
+            partyContainer.innerHTML = partyHtml;
+
+            // 2. Render Diplomacy Tab & Ledger
+            let ledgerHtml = '';
+            let diploHtml = '';
+
+            if (state.winner !== null) {
+                const winnerLabel = state.victory_type === 'PEACE'
+                    ? `☮️ PEACE VICTORY — ${state.winner_name}`
+                    : state.victory_type === 'DOMINATION'
+                        ? `👑 DOMINATION — ${state.winner_name} conquers all`
+                        : `🏆 SCORE VICTORY — ${state.winner_name} prevails`;
+                ledgerHtml += `<div class="ledger-item" style="color:#ecc987;font-size:18px; grid-column: 1 / -1; text-align: center;">${winnerLabel}</div>`;
+            }
+
+            nations.forEach(n => {
+                let wars = [];
+                let pacts = [];
+                const rels = state.diplomacy[n.id] || {};
+
+                Object.entries(rels).forEach(([otherId, statusStr]) => {
+                    const otherNation = state.nations[otherId];
+                    if (otherNation && !otherNation.is_defeated && otherId != n.id) {
+                        const status = typeof statusStr === "string" ? statusStr.toUpperCase() : statusStr;
+                        if (status === 'WAR' || status === 1 || statusStr === "1") {
+                            wars.push(otherNation.name);
+                        } else if (status === 'ALLIED' || status === 2 || statusStr === "2") {
+                            pacts.push(otherNation.name);
+                        }
+                    }
+                });
+
+                // Determine what the world thinks of n.
+                let globalGrievances = 0;
+                nations.forEach(other_n => {
+                    if (other_n.id !== n.id && other_n.grievances && other_n.grievances[n.id]) {
+                        globalGrievances += other_n.grievances[n.id];
+                    }
+                });
+
+                // Build Diplomacy entry for the Left Tab
+                const color = n.is_defeated ? "#555" : (archColors[n.personality] || n.color);
+                const icon = archIcons[n.personality] || "🏳️";
+
+                if (!n.is_defeated) {
+                    diploHtml += `<div class="diplo-block">
+                        <div class="diplo-nation" style="color:${color}">${icon} ${n.name}</div>
+                        ${wars.length > 0 ? `<div class="diplo-rel rel-war">⚔️ Wars: ${wars.join(', ')}</div>` : ''}
+                        ${pacts.length > 0 ? `<div class="diplo-rel rel-pact">🤝 Allies: ${pacts.join(', ')}</div>` : ''}
+                        ${globalGrievances > 0 ? `<div class="diplo-rel" style="color:${globalGrievances >= 100 ? '#ff5555; font-weight:bold;' : '#d85c36;'}">🔥 Global Tensions: ${globalGrievances}${globalGrievances >= 100 ? ' (PARIAH)' : ''}</div>` : ''}
+                        ${(wars.length === 0 && pacts.length === 0 && globalGrievances === 0) ? `<div class="diplo-rel" style="color:#777;">Isolationist</div>` : ''}
+                    </div>`;
+                }
+
+                // Build Ledger entry for the Central Area
+                if (n.is_defeated) {
+                    ledgerHtml += `<div class="ledger-item" style="opacity:0.4; border-left: 5px solid #222;">
+                    <span class="ledger-name"><del>${n.name}</del></span> <span style="color:#d85c36">[Fallen]</span>
+                </div>`;
+                } else {
+                    ledgerHtml += `
+                <div class="ledger-item" style="border-left: 5px solid ${color};">
+                    <span class="ledger-name" style="color:${color}">${icon} ${n.name}</span> <span style="font-size:12px;color:#aaa">(${n.personality}${state.strategies && state.strategies[n.id] ? ' · ' + state.strategies[n.id].toUpperCase() : ''})</span>
+                    <div style="margin-top:10px;">
+                        <div class="ledger-row"><span>💰 Wealth</span><span>${n.gold} <span style="color:#6bb093;font-size:12px;">(+${n.gold_yield + n.absorbed_gold_yield})</span></span></div>
+                        <div class="ledger-row"><span>🪖 Manpower</span><span>${n.manpower} <span style="color:#6bb093;font-size:12px;">(+${n.manpower_yield})</span></span></div>
+                        <div class="ledger-row"><span>🏭 Industry</span><span>${n.production} <span style="color:#6bb093;font-size:12px;">(+${n.production_yield + n.absorbed_prod_yield})</span></span></div>
+                        <div class="ledger-row"><span>🔬 Science</span><span>${n.science} <span style="color:#6bb093;font-size:12px;">(+${n.science_yield + n.absorbed_sci_yield})</span></span></div>
+                        <div class="ledger-row"><span>🏛️ Civics</span><span>${n.civics} <span style="color:#6bb093;font-size:12px;">(+${n.civic_yield})</span></span></div>
+                    </div>
+                </div>`;
+                }
+            });
+
+            ledgerContent.innerHTML = ledgerHtml;
+            diploTab.innerHTML = diploHtml || '<div style="color:#666; font-style:italic;">No visible relations.</div>';
+        }
+
+        async function executePost(url, payload) {
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => fetch(`http://localhost:8080${url}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }));
+        }
+
+        async function processTurn() {
+            if (lastState && lastState.winner !== null) {
+                if (isAutoplaying) {
+                    isAutoplaying = false;
+                    clearInterval(autoInterval);
+                    btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                    btnAuto.style.color = '#6bb093';
+                }
+                return;
+            }
+            try {
+                const res = await executePost('/api/command', { command: 'SUBMIT_TURN' });
+                const data = await res.json();
+
+                if (data.logs && data.logs.length > 0) {
+                    // Filter out resolution headers and game-over messages
+                    const filteredLogs = data.logs.filter(msg => !msg.startsWith('--- RESOLVING') && !msg.includes('game has concluded'));
+                    if (filteredLogs.length > 0 && data.message !== "Game Over") {
+                        pushLog('TIME', `EPOCH ${data.turn - 1} HAS PASSED`, 'global');
+                        filteredLogs.forEach(msg => {
+                            pushLog('WORLD', msg);
+                        });
+                    }
+                }
+
+                // Fetch updated state and check if game over
+                const stateRes = await fetch('/api/state').catch(() => fetch('http://localhost:8080/api/state'));
+                const stateData = await stateRes.json();
+                renderUI(stateData);
+
+                // Stop autoplay if someone has won
+                if (stateData.winner !== null && isAutoplaying) {
+                    isAutoplaying = false;
+                    clearInterval(autoInterval);
+                    btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                    btnAuto.style.color = '#6bb093';
+                    const victoryMsg = stateData.victory_type === 'PEACE'
+                        ? `☮️ PEACE VICTORY: ${stateData.winner_name} have reached a lasting accord!`
+                        : stateData.victory_type === 'DOMINATION'
+                            ? `👑 DOMINATION VICTORY: ${stateData.winner_name} has conquered the world!`
+                            : `🏆 SCORE VICTORY: ${stateData.winner_name} emerges supreme!`;
+                    pushLog('SYSTEM', victoryMsg, 'system');
+                }
+            } catch (e) { }
+        }
+
+
+
+        btnAuto.addEventListener('click', () => {
+            isAutoplaying = !isAutoplaying;
+            if (isAutoplaying) {
+                btnAuto.innerHTML = "<strong>⏸ PAUSE AUTOPLAY</strong>";
+                btnAuto.style.color = '#ecc987';
+                pushLog('AUTO', 'The wheels of fate spin on their own.', 'system');
+                autoInterval = setInterval(processTurn, 3000);
+            } else {
+                btnAuto.innerHTML = "<strong>▶ START AUTOPLAY</strong>";
+                btnAuto.style.color = '#6bb093';
+                pushLog('AUTO', 'You wrest back control.', 'system');
+                clearInterval(autoInterval);
+            }
+        });
+
+        btnReset.addEventListener('click', async () => {
+            const mode = document.getElementById('sim-mode').value;
+            const num = parseInt(document.getElementById('sim-num').value);
+            pushLog('SYSTEM', `Reinitializing grid. Mode: ${mode}, Nations: ${num}`, 'system');
+
+            portraitOffset = Math.floor(Math.random() * 20);
+
+            try {
+                await executePost('/api/reset', { mode: mode, num_players: num });
+                logScroll.innerHTML = `<div class="log-line">
+                <div class="speaker system">SYSTEM</div>
+                <div class="line-text">Data purged. A new world of ${num} nations is constructed.</div>
+            </div>`;
+                fetchState();
+            } catch (e) {
+                pushLog('SYSTEM', 'Reset failed.', 'system');
+            }
+        });
+
+        fetchState();
+        setInterval(fetchState, 3000);
+    </script>
+</body>
+
+</html>

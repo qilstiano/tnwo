@@ -1,0 +1,39 @@
+{
+  "seed": 42,
+  "num_players": 5,
+  "max_turns": 10,
+  "temperature": 0.7,
+  "turns_played": 10,
+  "total_time_seconds": 14.93,
+  "winner": null,
+  "victory_type": null,
+  "scores": {
+    "0": 1486,
+    "1": 1496,
+    "2": 1647,
+    "3": 1486,
+    "4": 1267
+  },
+  "nation_models": {
+    "0": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "1": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "2": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "3": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    },
+    "4": {
+      "backend_id": "shared",
+      "model": "qwen-7b"
+    }
+  }
+}

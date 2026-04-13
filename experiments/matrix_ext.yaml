@@ -1,0 +1,98 @@
+# =====================================================================
+# TNWO PPO experiment matrix — EXTENDED axes
+#
+# Three NEW orthogonal axes layered on top of the base exp_main grid,
+# each one swept against the headline diverse opponent pool
+# (aggressor / turtle / scientist / diplomat) with baseline rewards and
+# max_turns 100. The anchor point for comparison is `base_vs_diverse`
+# from experiments/matrix.yaml (exp_main).
+#
+#   D) starting_asymmetry — symmetric / current / extreme
+#      symmetric : every nation pinned to the dataclass defaults
+#      current   : legacy per-nation random jitter on starting yields
+#                  (already covered by base_vs_diverse; not repeated here)
+#      extreme   : nation 0 (the learner) begins with 2x stats AND yields
+#
+#   E) grace_period_turns — 0 / 10 / 50
+#      (base_vs_diverse already uses the default 25, not repeated)
+#      Probes whether a policy trained under a different peace window
+#      learns a meaningfully different rhythm. Expected: short grace
+#      encourages early diplomacy / early war; long grace pushes more
+#      economic build-up before any external action.
+#
+#   F) starting_action_points — 2 / 4
+#      (base_vs_diverse already uses 3, not repeated)
+#      Tests how the policy prioritises under a tighter / wider budget.
+#      CAUTION: changing the action budget changes the observation
+#      dimension (queued-action slots scale with AP), so each of these
+#      runs produces a policy with a DIFFERENT obs space. The eval and
+#      plot pipelines read the per-run train_config.json and rebuild
+#      the env with matching parameters, so everything still lines up.
+#
+# Total: 2 + 3 + 2 = 7 runs, each 200k timesteps, ~15 min/run on an
+# H200 at 4 concurrent workers → ~30 min wall clock for the full sweep.
+#
+# Each run is launched as a separate `python train_ppo.py` subprocess by
+# experiments/run_matrix.py and writes into outputs/exp_ext/<run.name>/
+# so the existing exp_main/ outputs are not disturbed.
+# =====================================================================
+
+experiment_name: exp_ext
+defaults:
+  total_timesteps: 200000
+  num_players: 5
+  learner_id: 0
+  max_turns: 100
+  seed: 0
+  device: cuda
+  checkpoint_freq: 50000
+  n_steps: 2048
+  batch_size: 256
+  policy_hidden_size: 256
+  dense_reward_scale: 0.01
+  terminal_win_reward: 100.0
+  terminal_peace_reward: 50.0
+  terminal_loss_penalty: -100.0
+  annex_bonus: 20.0
+  # New-axis defaults — explicit so each run records what it used.
+  grace_period_turns: 25
+  starting_asymmetry: current
+  starting_action_points: 3
+
+runs:
+  # -------------------------------------------------------------------
+  # Axis D — starting asymmetry
+  # -------------------------------------------------------------------
+  - name: sym_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    starting_asymmetry: symmetric
+
+  - name: extreme_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    starting_asymmetry: extreme
+
+  # -------------------------------------------------------------------
+  # Axis E — grace period length
+  # -------------------------------------------------------------------
+  - name: grace0_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    grace_period_turns: 0
+
+  - name: grace10_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    grace_period_turns: 10
+
+  - name: grace50_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    grace_period_turns: 50
+
+  # -------------------------------------------------------------------
+  # Axis F — action budget per turn
+  # -------------------------------------------------------------------
+  - name: ap2_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    starting_action_points: 2
+
+  - name: ap4_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    starting_action_points: 4

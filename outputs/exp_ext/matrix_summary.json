@@ -1,0 +1,62 @@
+{
+  "experiment_name": "exp_ext",
+  "completed_at": "2026-04-11 07:01:09",
+  "results": [
+    {
+      "name": "sym_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 544.9,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/sym_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/sym_vs_diverse/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "grace10_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 553.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace10_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace10_vs_diverse/train.log",
+      "gpu": 3
+    },
+    {
+      "name": "grace0_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 562.6,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace0_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace0_vs_diverse/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "ap4_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 465.2,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/ap4_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/ap4_vs_diverse/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "grace50_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 527.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace50_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/grace50_vs_diverse/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "extreme_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 1587.1,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/extreme_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/extreme_vs_diverse/train.log",
+      "gpu": 1
+    },
+    {
+      "name": "ap2_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 1604.8,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/ap2_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_ext/ap2_vs_diverse/train.log",
+      "gpu": 1
+    }
+  ]
+}

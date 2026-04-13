@@ -36,10 +36,16 @@ class NationEnv(gym.Env):
         opponent_backend: Optional[Dict[str, str]] = None,
         nation_backends: Optional[Dict[int, Dict[str, str]]] = None,
         nation_strategies: Optional[Dict[int, str]] = None,
+        rule_opponent_strategies: Optional[Any] = None,
+        grace_period_turns: int = 25,
+        starting_asymmetry: str = "current",
+        starting_action_points: int = 3,
     ):
         super().__init__()
         if learner_id >= num_players:
             raise ValueError("learner_id must be smaller than num_players")
+        if starting_action_points < 1:
+            raise ValueError("starting_action_points must be >= 1")
 
         self.num_players = num_players
         self.learner_id = learner_id
@@ -55,18 +61,29 @@ class NationEnv(gym.Env):
         self.opponent_backend = opponent_backend
         self.nation_backends = nation_backends
         self.nation_strategies = nation_strategies
+        self.rule_opponent_strategies = self._normalize_rule_strategies(
+            rule_opponent_strategies, num_players, learner_id
+        )
+        self.grace_period_turns = int(grace_period_turns)
+        self.starting_asymmetry = starting_asymmetry
+        self.starting_action_points = int(starting_action_points)
 
         self.action_catalog = build_action_catalog(num_players)
         self.action_space = spaces.Discrete(len(self.action_catalog))
 
         random.seed(seed)
-        sample_state = GameState(num_players)
+        sample_state = GameState(
+            num_players,
+            grace_period_turns=self.grace_period_turns,
+            starting_asymmetry=self.starting_asymmetry,
+            starting_action_points=self.starting_action_points,
+        )
         sample_obs = encode_observation(
             sample_state,
             learner_id=self.learner_id,
             num_players=self.num_players,
             max_turns=self.max_turns,
-            queued_action_slots=[-1, -1, -1],
+            queued_action_slots=[-1] * self.starting_action_points,
             catalog_size=len(self.action_catalog),
         )
         self.observation_space = spaces.Box(
@@ -79,7 +96,7 @@ class NationEnv(gym.Env):
         self.state: Optional[GameState] = None
         self.handler: Optional[ActionHandler] = None
         self.opponents: Dict[int, Any] = {}
-        self.current_action_slots = [-1, -1, -1]
+        self.current_action_slots = [-1] * self.starting_action_points
         self.prev_score = 0
         self.last_logs: List[str] = []
         self.done = False
@@ -96,10 +113,15 @@ class NationEnv(gym.Env):
             random.seed(int(reset_seed))
             np.random.seed(int(reset_seed))
 
-        self.state = GameState(self.num_players)
+        self.state = GameState(
+            self.num_players,
+            grace_period_turns=self.grace_period_turns,
+            starting_asymmetry=self.starting_asymmetry,
+            starting_action_points=self.starting_action_points,
+        )
         self.handler = ActionHandler(self.state)
         self.opponents = self._build_opponents()
-        self.current_action_slots = [-1, -1, -1]
+        self.current_action_slots = [-1] * self.starting_action_points
         self.prev_score = compute_score(self.state, self.learner_id)
         self.last_logs = []
         self.done = False
@@ -186,7 +208,7 @@ class NationEnv(gym.Env):
             info["winner"] = winner
             info["turn"] = self.state.turn
             self.prev_score = next_score
-            self.current_action_slots = [-1, -1, -1]
+            self.current_action_slots = [-1] * self.starting_action_points
 
         obs = self._get_obs()
         info["action_mask"] = self.action_masks()
@@ -220,13 +242,41 @@ class NationEnv(gym.Env):
 
         return list(self.last_logs)
 
+    @staticmethod
+    def _normalize_rule_strategies(value, num_players: int, learner_id: int) -> Dict[int, str]:
+        """Accept either a list aligned with opponent order or a {nid: strategy} dict.
+
+        Returns a dict {opponent_nid: strategy_name}. Missing entries default to
+        'balanced'.
+        """
+        opponent_ids = [nid for nid in range(num_players) if nid != learner_id]
+        result: Dict[int, str] = {nid: "balanced" for nid in opponent_ids}
+        if value is None:
+            return result
+        if isinstance(value, dict):
+            for k, v in value.items():
+                k_int = int(k)
+                if k_int in result:
+                    result[k_int] = str(v)
+            return result
+        if isinstance(value, (list, tuple)):
+            for nid, strat in zip(opponent_ids, value):
+                result[nid] = str(strat)
+            return result
+        raise ValueError(
+            f"rule_opponent_strategies must be list, dict, or None — got {type(value)}"
+        )
+
     def _build_opponents(self) -> Dict[int, Any]:
         opponent_ids = [
             nid for nid in range(self.num_players) if nid != self.learner_id
         ]
 
         if self.opponent_mode != "llm":
-            return {nid: AIAgent(nid) for nid in opponent_ids}
+            return {
+                nid: AIAgent(nid, strategy=self.rule_opponent_strategies[nid])
+                for nid in opponent_ids
+            }
 
         from ai.config import NATION_STRATEGIES as DEFAULT_STRATEGIES
 

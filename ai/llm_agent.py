@@ -252,105 +252,340 @@ class LLMAgent:
         strategy_data = STRATEGY_LIBRARY.get(strategy_key)
 
         if strategy_data:
-            strategy_block = f"""{strategy_data['directive']} PRIORITY: {strategy_data['priority_actions']}. Use at least 2 priority actions."""
+            strategy_block = (f"{strategy_data['directive']} "
+                              f"Your preferred action types are: {strategy_data['priority_actions']}. "
+                              f"Use at least 2 of these preferred types every turn when they are legal.")
         else:
             strategy_block = "Choose the best actions to maximize your score."
 
-        # Other nation IDs
+        all_techs = ", ".join(t.value for t in Tech)
+        all_civics = ", ".join(c.value for c in Civic)
+
         other_ids = [n.id for n in state.nations.values() if n.id != self.player_id and not n.is_defeated]
-        ex = other_ids[0] if other_ids else 1
+        ex_id = other_ids[0] if other_ids else 1
+        ex_tech = list(Tech)[0].value
+        ex_civic = list(Civic)[0].value
 
-        return f"""You control nation {self.player_id} ("{nation.name}"). {strategy_block}
+        return f"""You are the ruler of nation {self.player_id}. {strategy_block}
 
-ACTIONS (pick exactly {ap}, use exact syntax shown):
+=== ACTION SYNTAX (always "COMMAND argument", space-separated, never underscore-separated) ===
 HARVEST GOLD | HARVEST MANPOWER | HARVEST PRODUCTION | HARVEST SCIENCE | HARVEST CIVICS
-RESEARCH <tech> | PURSUE_CIVIC <civic> (only if none in progress)
-PROPOSE_ALLIANCE {ex} | ACCEPT_ALLIANCE {ex} | DECLARE_WAR {ex} | MILITARY_STRIKE {ex}
-PROPOSE_TRADE {ex} | ACCEPT_TRADE {ex} | PROPOSE_RESEARCH {ex} | ACCEPT_RESEARCH {ex}
-INVEST MILITARY | INVEST MANPOWER | INVEST INDUSTRY | INVEST SCIENCE | INVEST CIVICS (costs 200 gold)
-SABOTAGE {ex} (costs 50 gold) | SKIRMISH {ex} (costs 20 manpower)
+  → always available. Example: "HARVEST GOLD"
+INVEST MANPOWER | INVEST INDUSTRY | INVEST SCIENCE | INVEST CIVICS | INVEST MILITARY
+  → costs 200 gold. Valid categories: MANPOWER, INDUSTRY, SCIENCE, CIVICS, MILITARY. "INVEST GOLD" is INVALID.
+RESEARCH {ex_tech}
+  → replace "{ex_tech}" with any tech name from: {all_techs}
+PURSUE_CIVIC {ex_civic}
+  → replace "{ex_civic}" with any civic name from: {all_civics}
+DECLARE_WAR {ex_id}
+  → replace {ex_id} with the target nation's integer ID. Example: "DECLARE_WAR {ex_id}"
+MILITARY_STRIKE {ex_id}
+  → replace {ex_id} with target ID. Only valid when already at war with that nation.
+PROPOSE_ALLIANCE {ex_id} | ACCEPT_ALLIANCE {ex_id}
+PROPOSE_TRADE {ex_id} | ACCEPT_TRADE {ex_id}
+PROPOSE_RESEARCH {ex_id} | ACCEPT_RESEARCH {ex_id}
+SABOTAGE {ex_id} | SKIRMISH {ex_id}
 
-RULES: target_id is integer, not name. ACCEPT only if pending. MILITARY_STRIKE only at war. RESEARCH/PURSUE_CIVIC only if none in progress.
-SCORE = gold + manpower + production + (techs x 500) + (civics x 500). Eliminated if infrastructure = 0.
+=== RULES (strictly enforced — violations are silently replaced with HARVEST GOLD) ===
+1. Pick EXACTLY {ap} actions. No more, no less.
+2. Nation IDs are integers. You MUST include the ID: "DECLARE_WAR {ex_id}", NOT "DECLARE_WAR".
+3. DECLARE_WAR takes effect NEXT turn. Never use MILITARY_STRIKE in the same turn as DECLARE_WAR.
+4. MILITARY_STRIKE only when relation is already "At War".
+5. ACCEPT_ALLIANCE / ACCEPT_TRADE / ACCEPT_RESEARCH: ONLY when a pending proposal is listed in THIS TURN NOTES. Using ACCEPT without a pending proposal is always rejected.
+6. RESEARCH / PURSUE_CIVIC: cannot start a new one while one is already in progress.
+7. INVEST needs 200 gold. SABOTAGE needs 50 gold. SKIRMISH needs 20 manpower.
+8. Targets must be alive, non-defeated nations other than yourself.
 
-Reply with ONLY this JSON, no other text:
-{{"reasoning":"short sentence","actions":["HARVEST MANPOWER","DECLARE_WAR {ex}","MILITARY_STRIKE {ex}"]}}"""
+=== SCORING ===
+score = gold + manpower + production + (unlocked_techs × 500) + (unlocked_civics × 500)
+A nation is eliminated when its infrastructure reaches 0.
+
+Reply with ONLY valid JSON ({ap} actions), no other text:
+{{"reasoning": "one sentence explaining your strategy", "actions": ["HARVEST MANPOWER", "DECLARE_WAR {ex_id}", "RESEARCH {ex_tech}"]}}"""
 
     def _build_turn_prompt(self, state: GameState) -> str:
         nation = state.nations[self.player_id]
         lines = []
 
-        lines.append(f"TURN {state.turn}")
-        lines.append("Use only the current state snapshot below. Do not assume access to hidden past actions or intent logs.")
+        lines.append(f"=== TURN {state.turn} ===")
         lines.append("")
-        lines.append(f"YOU ARE: Nation {nation.id} ({nation.name})")
-        lines.append("")
-        lines.append("GLOBAL STATE SNAPSHOT AFTER THE PREVIOUS TURN:")
 
+        # --- Your nation ---
+        lines.append(f"YOUR NATION: {nation.id} ({nation.name})")
+        lines.append(
+            f"  Resources:  Gold={nation.gold}, Manpower={nation.manpower}, "
+            f"Production={nation.production}, Science={nation.science}, Civics={nation.civics}"
+        )
+        lines.append(
+            f"  Yields/turn: Gold={nation.gold_yield + nation.absorbed_gold_yield}, "
+            f"Manpower={nation.manpower_yield}, "
+            f"Production={nation.production_yield + nation.absorbed_prod_yield}, "
+            f"Science={nation.science_yield + nation.absorbed_sci_yield}, "
+            f"Civics={nation.civic_yield}"
+        )
+        lines.append(
+            f"  Military={nation.military} | Infrastructure={nation.infrastructure_health}% "
+            f"| War Exhaustion={nation.war_exhaustion}"
+        )
+        lines.append(f"  Techs unlocked:  {nation.unlocked_techs or 'None'}")
+        lines.append(f"  Civics unlocked: {nation.unlocked_civics or 'None'}")
+        if nation.current_tech:
+            cost = TECH_COSTS.get(nation.current_tech, 100)
+            lines.append(f"  Researching: {nation.current_tech} ({nation.tech_progress}/{cost})")
+        if nation.current_civic:
+            cost = CIVIC_COSTS.get(nation.current_civic, 100)
+            lines.append(f"  Pursuing civic: {nation.current_civic} ({nation.civic_progress}/{cost})")
+
+        # --- Opponents ---
+        lines.append("")
+        lines.append("OPPONENTS:")
         for other_id in sorted(state.nations):
+            if other_id == self.player_id:
+                continue
             other = state.nations[other_id]
-            lines.append("")
-            lines.append(f"NATION {other.id}: {other.name}")
-            lines.append(f"  STATUS: {'DEFEATED' if other.is_defeated else 'ALIVE'}")
+            status = "DEFEATED" if other.is_defeated else "alive"
             lines.append(
-                f"  RESOURCES: Gold={other.gold}, Manpower={other.manpower}, "
-                f"Production={other.production}, Science={other.science}, Civics={other.civics}"
+                f"  Nation {other.id} ({other.name}) [{status}]: "
+                f"Gold={other.gold}, Manpower={other.manpower}, Production={other.production}, "
+                f"Military={other.military}, Infra={other.infrastructure_health}%, "
+                f"Techs={other.unlocked_techs or 'None'}"
             )
-            lines.append(
-                f"  MILITARY: {other.military} | INFRASTRUCTURE: {other.infrastructure_health}% | "
-                f"WAR_EXHAUSTION: {other.war_exhaustion}"
-            )
-            lines.append(
-                f"  YIELDS/TURN: Gold={other.gold_yield + other.absorbed_gold_yield}, "
-                f"Manpower={other.manpower_yield}, "
-                f"Production={other.production_yield + other.absorbed_prod_yield}, "
-                f"Science={other.science_yield + other.absorbed_sci_yield}, "
-                f"Civics={other.civic_yield}"
-            )
-            lines.append(f"  TECHS UNLOCKED: {other.unlocked_techs or 'None'}")
-            lines.append(f"  CIVICS UNLOCKED: {other.unlocked_civics or 'None'}")
-            if other.current_tech:
-                cost = TECH_COSTS.get(other.current_tech, 100)
-                lines.append(f"  RESEARCHING: {other.current_tech} (progress: {other.tech_progress}/{cost})")
-            if other.current_civic:
-                cost = CIVIC_COSTS.get(other.current_civic, 100)
-                lines.append(f"  PURSUING CIVIC: {other.current_civic} (progress: {other.civic_progress}/{cost})")
-            if other.pending_trade_agreements:
-                lines.append(f"  PENDING TRADE PROPOSALS FROM: {other.pending_trade_agreements}")
-            if other.pending_research_pacts:
-                lines.append(f"  PENDING RESEARCH PROPOSALS FROM: {other.pending_research_pacts}")
-            if other.pending_joint_wars:
-                lines.append(f"  PENDING JOINT WAR PROPOSALS: {other.pending_joint_wars}")
-            pending_alliances = [
-                oid for oid, relation in state.diplomacy[other.id].items()
-                if relation == DiplomaticState.ALLIANCE_PENDING and oid != other.id
-            ]
-            if pending_alliances:
-                lines.append(f"  PENDING ALLIANCE PROPOSALS FROM: {pending_alliances}")
 
+        # --- Diplomacy ---
         lines.append("")
-        lines.append("GLOBAL DIPLOMACY:")
-        alive_ids = [nid for nid, other in state.nations.items() if not other.is_defeated]
-        for i, left_id in enumerate(alive_ids):
-            for right_id in alive_ids[i + 1:]:
-                relation = state.get_diplomatic_state(left_id, right_id)
-                left_name = state.nations[left_id].name
-                right_name = state.nations[right_id].name
-                lines.append(f"  {left_name} <-> {right_name}: {relation.value}")
+        lines.append("YOUR DIPLOMATIC RELATIONS:")
+        alive_others = [n for n in state.nations.values()
+                        if n.id != self.player_id and not n.is_defeated]
+        for other in alive_others:
+            rel = state.get_diplomatic_state(self.player_id, other.id)
+            lines.append(f"  Nation {other.id} ({other.name}): {rel.value}")
 
+        # --- Action availability summary (compact) ---
         lines.append("")
-        available_techs = [t.value for t in Tech if t.value not in nation.unlocked_techs]
-        available_civics = [c.value for c in Civic if c.value not in nation.unlocked_civics]
-        if not nation.current_tech and available_techs:
-            lines.append(f"YOUR AVAILABLE TECHS: {', '.join(available_techs)}")
-        if not nation.current_civic and available_civics:
-            lines.append(f"YOUR AVAILABLE CIVICS: {', '.join(available_civics)}")
+        lines.append("THIS TURN ACTION NOTES:")
+        target_ids = ", ".join(
+            f"{n.id} ({n.name})" for n in alive_others
+        )
+        lines.append(f"  VALID TARGET IDs: {target_ids}")
+        lines.append(f"  (Use these IDs in commands: DECLARE_WAR 2, PROPOSE_TRADE 0, SKIRMISH 4, etc.)")
+
+        # INVEST
+        if nation.gold >= 200:
+            lines.append(f"  INVEST: available (you have {nation.gold} gold)")
+        else:
+            lines.append(f"  INVEST: unavailable (need 200 gold, you have {nation.gold})")
+
+        # RESEARCH
+        if nation.current_tech:
+            lines.append(f"  *** DO NOT use RESEARCH — already researching '{nation.current_tech}'. Any RESEARCH action will be REJECTED. ***")
+        else:
+            available_techs = [t.value for t in Tech if t.value not in nation.unlocked_techs]
+            lines.append(f"  RESEARCH: available — choices: {', '.join(available_techs) or 'none left'}")
+
+        # PURSUE_CIVIC
+        if nation.current_civic:
+            lines.append(f"  *** DO NOT use PURSUE_CIVIC — already pursuing '{nation.current_civic}'. Any PURSUE_CIVIC action will be REJECTED. ***")
+        else:
+            available_civics = [c.value for c in Civic if c.value not in nation.unlocked_civics]
+            lines.append(f"  PURSUE_CIVIC: available — choices: {', '.join(available_civics) or 'none left'}")
+
+        # War / military
+        at_war_with = [n for n in alive_others
+                       if state.get_diplomatic_state(self.player_id, n.id) == DiplomaticState.WAR]
+        if at_war_with:
+            for enemy in at_war_with:
+                if nation.manpower >= 100 and nation.production >= 50:
+                    lines.append(f"  MILITARY_STRIKE {enemy.id}: available (at war with {enemy.name})")
+                else:
+                    lines.append(
+                        f"  MILITARY_STRIKE {enemy.id}: unavailable "
+                        f"(need manpower>=100 prod>=50, you have {nation.manpower},{nation.production})"
+                    )
+
+        # Pending proposals (ACCEPT actions)
+        pending_alliances = [
+            oid for oid, rel in state.diplomacy[self.player_id].items()
+            if rel == DiplomaticState.ALLIANCE_PENDING and oid != self.player_id
+            and oid in state.nations and not state.nations[oid].is_defeated
+        ]
+        if pending_alliances:
+            names = [f"Nation {oid} ({state.nations[oid].name})" for oid in pending_alliances]
+            lines.append(f"  ACCEPT_ALLIANCE: available from {', '.join(names)}")
+        if nation.pending_trade_agreements:
+            names = [f"Nation {oid} ({state.nations[oid].name})"
+                     for oid in nation.pending_trade_agreements if oid in state.nations]
+            lines.append(f"  ACCEPT_TRADE: available from {', '.join(names)}")
+        if nation.pending_research_pacts:
+            names = [f"Nation {oid} ({state.nations[oid].name})"
+                     for oid in nation.pending_research_pacts if oid in state.nations]
+            lines.append(f"  ACCEPT_RESEARCH: available from {', '.join(names)}")
+
+        if not pending_alliances:
+            lines.append("  ACCEPT_ALLIANCE: NOT available (no pending proposals)")
+        if not nation.pending_trade_agreements:
+            lines.append("  ACCEPT_TRADE: NOT available (no pending proposals)")
+        if not nation.pending_research_pacts:
+            lines.append("  ACCEPT_RESEARCH: NOT available (no pending proposals)")
+
+        # SABOTAGE / SKIRMISH resource check
+        if nation.gold < 50:
+            lines.append(f"  SABOTAGE: unavailable (need 50 gold, you have {nation.gold})")
+        if nation.manpower < 20:
+            lines.append(f"  SKIRMISH: unavailable (need 20 manpower, you have {nation.manpower})")
 
         return "\n".join(lines)
 
     # Output Validation
 
-    def _validate_and_extract(self, raw: str, state: GameState) -> Tuple[List[str], str]:
+    def _get_rejection_reason(self, action: str, state: GameState) -> str:
+        parts = action.strip().split()
+        if not parts:
+            return "empty action"
+        cmd = parts[0].upper()
+        nation = state.nations[self.player_id]
+
+        if cmd == "HARVEST":
+            if len(parts) < 2 or parts[1].upper() not in VALID_RESOURCES:
+                return f"invalid resource; use one of: {', '.join(VALID_RESOURCES)}"
+            return "valid"
+
+        if cmd == "INVEST":
+            valid_invest = {"MANPOWER", "INDUSTRY", "SCIENCE", "CIVICS", "MILITARY"}
+            if len(parts) < 2 or parts[1].upper() not in valid_invest:
+                return f"invalid type; use one of: {', '.join(valid_invest)}"
+            if nation.gold < 200:
+                return f"need 200 gold, you have {nation.gold}"
+            return "valid"
+
+        if cmd in ("DECLARE_WAR", "MILITARY_STRIKE", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE",
+                   "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH",
+                   "SABOTAGE", "SKIRMISH"):
+            if len(parts) < 2:
+                return "missing target nation ID"
+            try:
+                tid = int(parts[1])
+            except ValueError:
+                return f"'{parts[1]}' is not an integer nation ID"
+            if tid not in state.nations:
+                return f"nation {tid} does not exist"
+            if tid == self.player_id:
+                return "cannot target yourself"
+            if state.nations[tid].is_defeated:
+                return f"nation {tid} is already defeated"
+            if cmd == "MILITARY_STRIKE":
+                dipl = state.get_diplomatic_state(self.player_id, tid)
+                if dipl != DiplomaticState.WAR:
+                    return (f"not at war with nation {tid} (relation: {dipl.value}); "
+                            f"use DECLARE_WAR {tid} this turn, then MILITARY_STRIKE next turn")
+                if nation.manpower < 100:
+                    return f"need manpower>=100, you have {nation.manpower}"
+                if nation.production < 50:
+                    return f"need production>=50, you have {nation.production}"
+            if cmd == "SABOTAGE" and nation.gold < 50:
+                return f"need 50 gold, you have {nation.gold}"
+            if cmd == "SKIRMISH" and nation.manpower < 20:
+                return f"need 20 manpower, you have {nation.manpower}"
+            if cmd == "ACCEPT_ALLIANCE":
+                dipl = state.get_diplomatic_state(self.player_id, tid)
+                if dipl != DiplomaticState.ALLIANCE_PENDING:
+                    return f"no pending alliance from nation {tid}"
+            if cmd == "ACCEPT_TRADE":
+                if tid not in nation.pending_trade_agreements:
+                    return f"no pending trade proposal from nation {tid}"
+            if cmd == "ACCEPT_RESEARCH":
+                if tid not in nation.pending_research_pacts:
+                    return f"no pending research pact from nation {tid}"
+            return "valid"
+
+        if cmd == "RESEARCH":
+            if nation.current_tech:
+                return f"already researching '{nation.current_tech}'; wait until it finishes"
+            tech_name = " ".join(parts[1:])
+            if tech_name not in VALID_TECHS:
+                return f"unknown tech '{tech_name}'"
+            if tech_name in nation.unlocked_techs:
+                return f"already unlocked '{tech_name}'"
+            return "valid"
+
+        if cmd == "PURSUE_CIVIC":
+            if nation.current_civic:
+                return f"already pursuing '{nation.current_civic}'; wait until it finishes"
+            civic_name = " ".join(parts[1:])
+            if civic_name not in VALID_CIVICS:
+                return f"unknown civic '{civic_name}'"
+            if civic_name in nation.unlocked_civics:
+                return f"already unlocked '{civic_name}'"
+            return "valid"
+
+        return f"unknown command '{cmd}'"
+
+    def _build_legal_actions(self, state: GameState) -> str:
+        nation = state.nations[self.player_id]
+        alive_others = [n for n in state.nations.values()
+                        if n.id != self.player_id and not n.is_defeated]
+        lines = ["YOUR LEGAL ACTIONS THIS TURN (ONLY use actions from this list):"]
+
+        for res in sorted(VALID_RESOURCES):
+            lines.append(f"  HARVEST {res}")
+
+        if nation.gold >= 200:
+            for inv in ["MANPOWER", "INDUSTRY", "SCIENCE", "CIVICS", "MILITARY"]:
+                lines.append(f"  INVEST {inv}")
+        else:
+            lines.append(f"  (INVEST unavailable: need 200 gold, you have {nation.gold})")
+
+        if nation.current_tech:
+            lines.append(f"  (RESEARCH unavailable: already researching '{nation.current_tech}')")
+        else:
+            for t in Tech:
+                if t.value not in nation.unlocked_techs:
+                    lines.append(f"  RESEARCH {t.value}")
+
+        if nation.current_civic:
+            lines.append(f"  (PURSUE_CIVIC unavailable: already pursuing '{nation.current_civic}')")
+        else:
+            for c in Civic:
+                if c.value not in nation.unlocked_civics:
+                    lines.append(f"  PURSUE_CIVIC {c.value}")
+
+        for other in alive_others:
+            tid = other.id
+            dipl = state.get_diplomatic_state(self.player_id, tid)
+
+            if dipl == DiplomaticState.WAR:
+                if nation.manpower >= 100 and nation.production >= 50:
+                    lines.append(f"  MILITARY_STRIKE {tid}  # at war with {other.name}")
+                else:
+                    lines.append(
+                        f"  (MILITARY_STRIKE {tid} unavailable: "
+                        f"need manpower>=100,production>=50; "
+                        f"you have {nation.manpower},{nation.production})"
+                    )
+            else:
+                lines.append(f"  DECLARE_WAR {tid}  # current relation: {dipl.value}")
+
+            if dipl not in (DiplomaticState.WAR, DiplomaticState.ALLIED,
+                            DiplomaticState.ALLIANCE_PENDING):
+                lines.append(f"  PROPOSE_ALLIANCE {tid}")
+            if dipl == DiplomaticState.ALLIANCE_PENDING:
+                lines.append(f"  ACCEPT_ALLIANCE {tid}  # {other.name} proposed an alliance to you")
+
+            lines.append(f"  PROPOSE_TRADE {tid}")
+            if tid in nation.pending_trade_agreements:
+                lines.append(f"  ACCEPT_TRADE {tid}  # {other.name} proposed a trade")
+
+            lines.append(f"  PROPOSE_RESEARCH {tid}")
+            if tid in nation.pending_research_pacts:
+                lines.append(f"  ACCEPT_RESEARCH {tid}  # {other.name} proposed a research pact")
+
+            if nation.gold >= 50:
+                lines.append(f"  SABOTAGE {tid}  # costs 50 gold")
+            if nation.manpower >= 20:
+                lines.append(f"  SKIRMISH {tid}  # costs 20 manpower")
+
+        return "\n".join(lines)
+
+    def _validate_and_extract(self, raw: str, state: GameState) -> Tuple[List[str], str, List[str]]:
         text = raw.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
@@ -377,9 +612,10 @@ Reply with ONLY this JSON, no other text:
             reasoning = "No reasoning provided."
 
         valid_actions = []
+        rejections = []
         for action_str in data["actions"]:
-            action_str = str(action_str).strip()
-            # Fix common LLM formatting mistakes
+            action_str = str(action_str).strip().upper()
+            # Fix space-separated compound commands (LLM writes spaces instead of underscores)
             action_str = action_str.replace("DECLARE WAR", "DECLARE_WAR")
             action_str = action_str.replace("MILITARY STRIKE", "MILITARY_STRIKE")
             action_str = action_str.replace("PROPOSE ALLIANCE", "PROPOSE_ALLIANCE")
@@ -389,12 +625,48 @@ Reply with ONLY this JSON, no other text:
             action_str = action_str.replace("PROPOSE RESEARCH", "PROPOSE_RESEARCH")
             action_str = action_str.replace("ACCEPT RESEARCH", "ACCEPT_RESEARCH")
             action_str = action_str.replace("PURSUE CIVIC", "PURSUE_CIVIC")
-            action_str = action_str.replace("PROPOSE JOINT WAR", "PROPOSE_JOINT_WAR")
-            action_str = action_str.replace("ACCEPT JOINT WAR", "ACCEPT_JOINT_WAR")
+            # Fix HARVEST_X / INVEST_X (LLM uses underscore instead of space for argument)
+            action_str = re.sub(r'^HARVEST_', 'HARVEST ', action_str)
+            action_str = re.sub(r'^INVEST_', 'INVEST ', action_str)
+            # Fix COMMAND_N where N is a digit (e.g. DECLARE_WAR_0 -> DECLARE_WAR 0)
+            _CMDS_WITH_ID = (
+                "DECLARE_WAR", "MILITARY_STRIKE", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE",
+                "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH",
+                "SABOTAGE", "SKIRMISH",
+            )
+            for cmd in _CMDS_WITH_ID:
+                action_str = re.sub(rf'^{cmd}_(\d+)$', rf'{cmd} \1', action_str)
+            # Fix common INVEST confusions: INVEST GOLD -> HARVEST GOLD, INVEST PRODUCTION -> INVEST INDUSTRY
+            if action_str == "INVEST GOLD":
+                action_str = "HARVEST GOLD"
+            elif action_str == "INVEST PRODUCTION":
+                action_str = "INVEST INDUSTRY"
+            # Restore original casing for tech/civic names via case-insensitive lookup
+            parts = action_str.split(' ', 1)
+            if len(parts) == 2 and parts[0] in ('RESEARCH', 'PURSUE_CIVIC'):
+                raw_name = parts[1].replace('_', ' ')
+                # Match against known tech/civic names (case-insensitive)
+                canonical = None
+                for name in (list(VALID_TECHS) + list(VALID_CIVICS)):
+                    if name.upper() == raw_name.upper():
+                        canonical = name
+                        break
+                if canonical:
+                    # Auto-correct command if LLM used RESEARCH for a civic or PURSUE_CIVIC for a tech
+                    if parts[0] == 'RESEARCH' and canonical in VALID_CIVICS:
+                        action_str = 'PURSUE_CIVIC ' + canonical
+                    elif parts[0] == 'PURSUE_CIVIC' and canonical in VALID_TECHS:
+                        action_str = 'RESEARCH ' + canonical
+                    else:
+                        action_str = parts[0] + ' ' + canonical
+                else:
+                    action_str = parts[0] + ' ' + raw_name
             if self._is_valid_action(action_str, state):
                 valid_actions.append(action_str)
             else:
-                print(f"[LLM Agent {self.player_id}] REJECTED action: '{action_str}'")
+                reason = self._get_rejection_reason(action_str, state)
+                print(f"[LLM Agent {self.player_id}] REJECTED action: '{action_str}' ({reason})")
+                rejections.append(f"'{action_str}': {reason}")
 
         nation = state.nations[self.player_id]
         padded = 0
@@ -404,7 +676,7 @@ Reply with ONLY this JSON, no other text:
         if padded:
             print(f"[LLM Agent {self.player_id}] Padded {padded} actions with HARVEST GOLD")
 
-        return valid_actions[:nation.max_action_points], reasoning
+        return valid_actions[:nation.max_action_points], reasoning, rejections
 
     def _is_valid_action(self, action: str, state: GameState) -> bool:
         parts = action.strip().split()
@@ -486,7 +758,15 @@ Reply with ONLY this JSON, no other text:
         for attempt in range(MAX_RETRIES + 1):
             try:
                 raw = self.client.chat(system, user, temperature=LLM_TEMPERATURE)
-                actions, reasoning = self._validate_and_extract(raw, state)
+                actions, reasoning, rejections = self._validate_and_extract(raw, state)
+                if rejections and attempt < MAX_RETRIES:
+                    rejection_msg = "; ".join(rejections)
+                    user += (
+                        f"\n\nPREVIOUS ATTEMPT HAD INVALID ACTIONS — "
+                        f"{rejection_msg}. "
+                        f"Check THIS TURN ACTION NOTES above and pick valid replacements."
+                    )
+                    continue
                 return actions, reasoning
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 print(f"[LLM Agent {self.player_id}] Validation error (attempt {attempt+1}): {e}")

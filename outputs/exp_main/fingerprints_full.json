@@ -1,0 +1,470 @@
+{
+  "base_vs_balanced": {
+    "vs_balanced": {
+      "aggression": 0.0026936026936026937,
+      "science": 0.2606060606060606,
+      "economy": 0.6525252525252525,
+      "diplomacy": 0.08417508417508418
+    },
+    "vs_aggressor": {
+      "aggression": 0.025806451612903226,
+      "science": 0.8258064516129032,
+      "economy": 0.12688172043010754,
+      "diplomacy": 0.021505376344086023
+    },
+    "vs_diverse": {
+      "aggression": 0.019672131147540985,
+      "science": 0.43278688524590164,
+      "economy": 0.492896174863388,
+      "diplomacy": 0.0546448087431694
+    },
+    "vs_diplomat": {
+      "aggression": 0.00202020202020202,
+      "science": 0.2572390572390572,
+      "economy": 0.6525252525252525,
+      "diplomacy": 0.08821548821548822
+    }
+  },
+  "base_vs_aggressor": {
+    "vs_balanced": {
+      "aggression": 0.09665144596651445,
+      "science": 0.20624048706240486,
+      "economy": 0.1430745814307458,
+      "diplomacy": 0.5540334855403348
+    },
+    "vs_aggressor": {
+      "aggression": 0.08991228070175439,
+      "science": 0.7302631578947368,
+      "economy": 0.16885964912280702,
+      "diplomacy": 0.010964912280701754
+    },
+    "vs_diverse": {
+      "aggression": 0.15130023640661938,
+      "science": 0.30141843971631205,
+      "economy": 0.19976359338061467,
+      "diplomacy": 0.3475177304964539
+    },
+    "vs_diplomat": {
+      "aggression": 0.09225589225589226,
+      "science": 0.1892255892255892,
+      "economy": 0.13198653198653199,
+      "diplomacy": 0.5865319865319866
+    }
+  },
+  "base_vs_diverse": {
+    "vs_balanced": {
+      "aggression": 0.025362318840579712,
+      "science": 0.717391304347826,
+      "economy": 0.22826086956521738,
+      "diplomacy": 0.028985507246376812
+    },
+    "vs_aggressor": {
+      "aggression": 0.008948545861297539,
+      "science": 0.8903803131991052,
+      "economy": 0.06935123042505593,
+      "diplomacy": 0.03131991051454139
+    },
+    "vs_diverse": {
+      "aggression": 0.15300546448087432,
+      "science": 0.4360655737704918,
+      "economy": 0.3901639344262295,
+      "diplomacy": 0.020765027322404372
+    },
+    "vs_diplomat": {
+      "aggression": 0.03367003367003367,
+      "science": 0.30505050505050507,
+      "economy": 0.6518518518518519,
+      "diplomacy": 0.009427609427609427
+    }
+  },
+  "base_vs_diverse_200t": {
+    "vs_balanced": {
+      "aggression": 0.07903780068728522,
+      "science": 0.7646048109965635,
+      "economy": 0.1563573883161512,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.05925925925925926,
+      "science": 0.8666666666666667,
+      "economy": 0.06666666666666667,
+      "diplomacy": 0.007407407407407408
+    },
+    "vs_diverse": {
+      "aggression": 0.16333333333333333,
+      "science": 0.4477777777777778,
+      "economy": 0.3888888888888889,
+      "diplomacy": 0.0
+    },
+    "vs_diplomat": {
+      "aggression": 0.030976430976430977,
+      "science": 0.7326599326599327,
+      "economy": 0.23636363636363636,
+      "diplomacy": 0.0
+    }
+  },
+  "base_vs_diverse_seed1": {
+    "vs_balanced": {
+      "aggression": 0.08117443868739206,
+      "science": 0.6303972366148531,
+      "economy": 0.2659758203799655,
+      "diplomacy": 0.022452504317789293
+    },
+    "vs_aggressor": {
+      "aggression": 0.07692307692307693,
+      "science": 0.844017094017094,
+      "economy": 0.049145299145299144,
+      "diplomacy": 0.029914529914529916
+    },
+    "vs_diverse": {
+      "aggression": 0.23118279569892472,
+      "science": 0.3602150537634409,
+      "economy": 0.3682795698924731,
+      "diplomacy": 0.04032258064516129
+    },
+    "vs_diplomat": {
+      "aggression": 0.03973063973063973,
+      "science": 0.24983164983164982,
+      "economy": 0.6996632996632997,
+      "diplomacy": 0.010774410774410775
+    }
+  },
+  "base_vs_diverse_seed2": {
+    "vs_balanced": {
+      "aggression": 0.10674157303370786,
+      "science": 0.6404494382022472,
+      "economy": 0.20599250936329588,
+      "diplomacy": 0.04681647940074907
+    },
+    "vs_aggressor": {
+      "aggression": 0.016203703703703703,
+      "science": 0.8912037037037037,
+      "economy": 0.05787037037037037,
+      "diplomacy": 0.034722222222222224
+    },
+    "vs_diverse": {
+      "aggression": 0.19518377693282637,
+      "science": 0.5678073510773131,
+      "economy": 0.20532319391634982,
+      "diplomacy": 0.031685678073510776
+    },
+    "vs_diplomat": {
+      "aggression": 0.03973063973063973,
+      "science": 0.2430976430976431,
+      "economy": 0.7043771043771043,
+      "diplomacy": 0.012794612794612794
+    }
+  },
+  "base_vs_diplomat": {
+    "vs_balanced": {
+      "aggression": 0.2591093117408907,
+      "science": 0.09244264507422402,
+      "economy": 0.6484480431848852,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.8942528735632184,
+      "science": 0.034482758620689655,
+      "economy": 0.07126436781609195,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.854978354978355,
+      "science": 0.05194805194805195,
+      "economy": 0.09307359307359307,
+      "diplomacy": 0.0
+    },
+    "vs_diplomat": {
+      "aggression": 0.2713804713804714,
+      "science": 0.10505050505050505,
+      "economy": 0.6235690235690236,
+      "diplomacy": 0.0
+    }
+  },
+  "annex_vs_balanced": {
+    "vs_balanced": {
+      "aggression": 0.12323232323232323,
+      "science": 0.42693602693602695,
+      "economy": 0.428956228956229,
+      "diplomacy": 0.020875420875420877
+    },
+    "vs_aggressor": {
+      "aggression": 0.12337662337662338,
+      "science": 0.8722943722943723,
+      "economy": 0.004329004329004329,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.1928721174004193,
+      "science": 0.8050314465408805,
+      "economy": 0.0,
+      "diplomacy": 0.0020964360587002098
+    },
+    "vs_diplomat": {
+      "aggression": 0.1164983164983165,
+      "science": 0.38922558922558925,
+      "economy": 0.45925925925925926,
+      "diplomacy": 0.035016835016835016
+    }
+  },
+  "annex_vs_aggressor": {
+    "vs_balanced": {
+      "aggression": 0.010101010101010102,
+      "science": 0.31717171717171716,
+      "economy": 0.02558922558922559,
+      "diplomacy": 0.6471380471380471
+    },
+    "vs_aggressor": {
+      "aggression": 0.04112554112554113,
+      "science": 0.8961038961038961,
+      "economy": 0.012987012987012988,
+      "diplomacy": 0.049783549783549784
+    },
+    "vs_diverse": {
+      "aggression": 0.008450704225352112,
+      "science": 0.41220657276995304,
+      "economy": 0.004694835680751174,
+      "diplomacy": 0.5746478873239437
+    },
+    "vs_diplomat": {
+      "aggression": 0.014814814814814815,
+      "science": 0.4006734006734007,
+      "economy": 0.03636363636363636,
+      "diplomacy": 0.5481481481481482
+    }
+  },
+  "annex_vs_diverse": {
+    "vs_balanced": {
+      "aggression": 0.057912457912457915,
+      "science": 0.4734006734006734,
+      "economy": 0.1595959595959596,
+      "diplomacy": 0.3090909090909091
+    },
+    "vs_aggressor": {
+      "aggression": 0.072992700729927,
+      "science": 0.8710462287104623,
+      "economy": 0.05596107055961071,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.13357400722021662,
+      "science": 0.5667870036101083,
+      "economy": 0.1552346570397112,
+      "diplomacy": 0.1444043321299639
+    },
+    "vs_diplomat": {
+      "aggression": 0.059932659932659935,
+      "science": 0.46936026936026937,
+      "economy": 0.1494949494949495,
+      "diplomacy": 0.3212121212121212
+    }
+  },
+  "annex_vs_diverse_200t": {
+    "vs_balanced": {
+      "aggression": 0.1198501872659176,
+      "science": 0.6573033707865169,
+      "economy": 0.22284644194756553,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.07407407407407407,
+      "science": 0.8592592592592593,
+      "economy": 0.06666666666666667,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.2032520325203252,
+      "science": 0.6097560975609756,
+      "economy": 0.18699186991869918,
+      "diplomacy": 0.0
+    },
+    "vs_diplomat": {
+      "aggression": 0.052525252525252523,
+      "science": 0.25521885521885523,
+      "economy": 0.6922558922558922,
+      "diplomacy": 0.0
+    }
+  },
+  "annex_vs_diplomat": {
+    "vs_balanced": {
+      "aggression": 0.16,
+      "science": 0.8228571428571428,
+      "economy": 0.017142857142857144,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.07407407407407407,
+      "science": 0.9259259259259259,
+      "economy": 0.0,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.10714285714285714,
+      "science": 0.8928571428571429,
+      "economy": 0.0,
+      "diplomacy": 0.0
+    },
+    "vs_diplomat": {
+      "aggression": 0.25387205387205386,
+      "science": 0.32861952861952864,
+      "economy": 0.4175084175084175,
+      "diplomacy": 0.0
+    }
+  },
+  "peace_vs_balanced": {
+    "vs_balanced": {
+      "aggression": 0.055218855218855216,
+      "science": 0.34949494949494947,
+      "economy": 0.5952861952861953,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.11185682326621924,
+      "science": 0.883668903803132,
+      "economy": 0.0044742729306487695,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.08449396471680594,
+      "science": 0.4568245125348189,
+      "economy": 0.308263695450325,
+      "diplomacy": 0.15041782729805014
+    },
+    "vs_diplomat": {
+      "aggression": 0.05589225589225589,
+      "science": 0.36835016835016837,
+      "economy": 0.5757575757575758,
+      "diplomacy": 0.0
+    }
+  },
+  "peace_vs_aggressor": {
+    "vs_balanced": {
+      "aggression": 0.16700336700336701,
+      "science": 0.7555555555555555,
+      "economy": 0.07744107744107744,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.32666666666666666,
+      "science": 0.6422222222222222,
+      "economy": 0.011111111111111112,
+      "diplomacy": 0.02
+    },
+    "vs_diverse": {
+      "aggression": 0.20938967136150236,
+      "science": 0.6,
+      "economy": 0.18967136150234742,
+      "diplomacy": 0.0009389671361502347
+    },
+    "vs_diplomat": {
+      "aggression": 0.16296296296296298,
+      "science": 0.8053872053872054,
+      "economy": 0.02962962962962963,
+      "diplomacy": 0.00202020202020202
+    }
+  },
+  "peace_vs_diverse": {
+    "vs_balanced": {
+      "aggression": 0.03683241252302026,
+      "science": 0.5930018416206262,
+      "economy": 0.3701657458563536,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.05747126436781609,
+      "science": 0.8574712643678161,
+      "economy": 0.06436781609195402,
+      "diplomacy": 0.020689655172413793
+    },
+    "vs_diverse": {
+      "aggression": 0.5522273425499232,
+      "science": 0.2626728110599078,
+      "economy": 0.17127496159754224,
+      "diplomacy": 0.013824884792626729
+    },
+    "vs_diplomat": {
+      "aggression": 0.02154882154882155,
+      "science": 0.21212121212121213,
+      "economy": 0.7663299663299663,
+      "diplomacy": 0.0
+    }
+  },
+  "peace_vs_diplomat": {
+    "vs_balanced": {
+      "aggression": 0.6127946127946128,
+      "science": 0.06464646464646465,
+      "economy": 0.32255892255892255,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.8189300411522634,
+      "science": 0.12139917695473251,
+      "economy": 0.059670781893004114,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.6955128205128205,
+      "science": 0.09615384615384616,
+      "economy": 0.20352564102564102,
+      "diplomacy": 0.004807692307692308
+    },
+    "vs_diplomat": {
+      "aggression": 0.6693602693602694,
+      "science": 0.0707070707070707,
+      "economy": 0.25993265993265996,
+      "diplomacy": 0.0
+    }
+  },
+  "dense_only_vs_diverse": {
+    "vs_balanced": {
+      "aggression": 0.00404040404040404,
+      "science": 0.494949494949495,
+      "economy": 0.4909090909090909,
+      "diplomacy": 0.010101010101010102
+    },
+    "vs_aggressor": {
+      "aggression": 0.0,
+      "science": 0.910958904109589,
+      "economy": 0.0410958904109589,
+      "diplomacy": 0.04794520547945205
+    },
+    "vs_diverse": {
+      "aggression": 0.0056022408963585435,
+      "science": 0.6489262371615313,
+      "economy": 0.3314659197012138,
+      "diplomacy": 0.014005602240896359
+    },
+    "vs_diplomat": {
+      "aggression": 0.00404040404040404,
+      "science": 0.5252525252525253,
+      "economy": 0.46060606060606063,
+      "diplomacy": 0.010101010101010102
+    }
+  },
+  "terminal_only_vs_diverse": {
+    "vs_balanced": {
+      "aggression": 0.15355805243445692,
+      "science": 0.7546816479400749,
+      "economy": 0.09176029962546817,
+      "diplomacy": 0.0
+    },
+    "vs_aggressor": {
+      "aggression": 0.07352941176470588,
+      "science": 0.9191176470588235,
+      "economy": 0.007352941176470588,
+      "diplomacy": 0.0
+    },
+    "vs_diverse": {
+      "aggression": 0.30445246690734057,
+      "science": 0.5643802647412756,
+      "economy": 0.13116726835138387,
+      "diplomacy": 0.0
+    },
+    "vs_diplomat": {
+      "aggression": 0.21481481481481482,
+      "science": 0.2814814814814815,
+      "economy": 0.5037037037037037,
+      "diplomacy": 0.0
+    }
+  }
+}

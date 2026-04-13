@@ -219,3 +219,39 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── TNWO project-specific ────────────────────────────────────────────────────
+# Runtime scratch at repo root
+nohup.out
+nohup_*.out
+
+# RL training artifacts inside outputs/<exp>/<run>/
+#   Keep: train_config.json, training_curve.csv, eval_results.json
+#   Drop: model weights, checkpoints, TensorBoard runs, per-run logs
+outputs/**/checkpoints/
+outputs/**/tb_logs/
+outputs/**/*.zip
+
+# Aggregate experiment logs (run_all_*, per-sweep logs)
+outputs/**/run_all_*.log
+outputs/**/*.log
+
+# Ad-hoc / temporary artifacts at outputs/ root
+# (kept out of version control — reproduce via run_arena.py / evaluate_ppo.py)
+outputs/arena_*.jsonl
+outputs/arena_*_summary.json
+outputs/game_export_*.jsonl
+outputs/game_export_*_summary.json
+outputs/ppo_vs_llm_*/
+outputs/ppo_eval_*.json
+outputs/ppo_eval_*.log
+outputs/vllm_*.log
+outputs/nohup_*.log
+outputs/run_*.log
+outputs/run—*.log
+
+# Experiment plot scratch directory
+experiments/__pycache__/
+
+# Early ad-hoc dev figures (not used by the paper)
+outputs/figures/

@@ -52,6 +52,28 @@ def parse_args():
     parser.add_argument("--checkpoint-freq", type=int, default=20000,
                         help="Save a checkpoint every N timesteps")
     parser.add_argument("--tensorboard-log", default=None, help="Optional tensorboard log dir")
+    parser.add_argument("--device", default="auto",
+                        help="Torch device for PPO (auto, cpu, cuda, cuda:0, ...)")
+
+    # Rule-based opponent strategies (one name per opponent, in nation_id order
+    # excluding the learner). Valid names: balanced, aggressor, turtle, scientist,
+    # trader, diplomat. If omitted, all opponents use 'balanced'.
+    parser.add_argument("--opponent-strategies", nargs="*", default=None,
+                        help="Per-opponent rule-based strategy names")
+
+    # Extended experiment axes — all default to the original behaviour so
+    # existing runs reproduce exactly.
+    parser.add_argument("--grace-period-turns", type=int, default=25,
+                        help="Turns at the start of the game where foreign "
+                             "actions (war/diplomacy) are blocked")
+    parser.add_argument("--starting-asymmetry",
+                        choices=["symmetric", "current", "extreme"],
+                        default="current",
+                        help="Initial yield/resource distribution: symmetric "
+                             "(all nations identical), current (legacy random "
+                             "jitter), extreme (nation 0 starts with 2x stats)")
+    parser.add_argument("--starting-action-points", type=int, default=3,
+                        help="Per-turn action budget for every nation")
 
     # LLM opponent configuration
     parser.add_argument("--opponent-mode", choices=["rulebased", "llm"], default="rulebased",
@@ -201,6 +223,10 @@ def main():
         opponent_mode=args.opponent_mode,
         opponent_backend=opponent_backend,
         nation_backends=nation_backends,
+        rule_opponent_strategies=args.opponent_strategies,
+        grace_period_turns=args.grace_period_turns,
+        starting_asymmetry=args.starting_asymmetry,
+        starting_action_points=args.starting_action_points,
     )
     env = ActionMasker(base_env, mask_fn)
 
@@ -230,6 +256,7 @@ def main():
         vf_coef=args.vf_coef,
         tensorboard_log=tb_log,
         policy_kwargs=policy_kwargs,
+        device=args.device,
     )
 
     checkpoint_cb = CheckpointCallback(
@@ -285,6 +312,11 @@ def main():
         "policy_hidden_size": args.policy_hidden_size,
         "checkpoint_freq": args.checkpoint_freq,
         "opponent_mode": args.opponent_mode,
+        "opponent_strategies": args.opponent_strategies,
+        "device": args.device,
+        "grace_period_turns": args.grace_period_turns,
+        "starting_asymmetry": args.starting_asymmetry,
+        "starting_action_points": args.starting_action_points,
         "opponent_provider": args.opponent_provider if args.opponent_mode == "llm" else None,
         "opponent_base_url": args.opponent_base_url if args.opponent_mode == "llm" else None,
         "opponent_model": args.opponent_model if args.opponent_mode == "llm" else None,

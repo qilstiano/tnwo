@@ -1,0 +1,157 @@
+# =====================================================================
+# TNWO PPO experiment matrix
+#
+# Three orthogonal axes:
+#   A) opponent composition (4 levels) — homogeneous balanced / aggressor /
+#      diplomat, plus a mixed diverse pool
+#   B) reward setting (5 levels) — baseline / dense_only / terminal_only /
+#      annex_heavy / peace_heavy
+#   C) training scenario — max_turns 100 (default) and 200 for long-game
+#      cross-checks
+#
+# Total: 12 main + 4 ablation + 2 long-game = 18 runs (within budget).
+#
+# Each run is launched as a separate `python train_ppo.py` subprocess by
+# experiments/run_matrix.py and writes into outputs/<experiment>/<run.name>/
+#
+# Field reference (anything not set falls back to train_ppo.py defaults):
+#   name                    unique label, becomes the output sub-directory
+#   total_timesteps         PPO timesteps
+#   num_players             nation count (5 default)
+#   learner_id              which nation the PPO learner controls (0)
+#   max_turns               turn cap per episode
+#   seed
+#   opponent_strategies     list of 4 strategy names (one per opponent slot)
+#   dense_reward_scale
+#   terminal_win_reward
+#   terminal_peace_reward
+#   terminal_loss_penalty
+#   annex_bonus
+# =====================================================================
+
+experiment_name: exp_main
+defaults:
+  total_timesteps: 200000
+  num_players: 5
+  learner_id: 0
+  max_turns: 100
+  seed: 0
+  device: cuda
+  checkpoint_freq: 50000
+  n_steps: 2048
+  batch_size: 256
+  policy_hidden_size: 256
+  dense_reward_scale: 0.01
+  terminal_win_reward: 100.0
+  terminal_peace_reward: 50.0
+  terminal_loss_penalty: -100.0
+  annex_bonus: 20.0
+
+# ---------------------------------------------------------------------
+# Block 1 — main 12-run grid: 4 opponent pools × 3 reward variants
+# ---------------------------------------------------------------------
+runs:
+  # ---- baseline reward ----
+  - name: base_vs_balanced
+    opponent_strategies: [balanced, balanced, balanced, balanced]
+
+  - name: base_vs_aggressor
+    opponent_strategies: [aggressor, aggressor, aggressor, aggressor]
+
+  - name: base_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+
+  - name: base_vs_diplomat
+    opponent_strategies: [diplomat, diplomat, diplomat, diplomat]
+
+  # ---- annex_heavy reward (encourages aggression) ----
+  - name: annex_vs_balanced
+    opponent_strategies: [balanced, balanced, balanced, balanced]
+    terminal_peace_reward: 0.0
+    annex_bonus: 100.0
+
+  - name: annex_vs_aggressor
+    opponent_strategies: [aggressor, aggressor, aggressor, aggressor]
+    terminal_peace_reward: 0.0
+    annex_bonus: 100.0
+
+  - name: annex_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    terminal_peace_reward: 0.0
+    annex_bonus: 100.0
+
+  - name: annex_vs_diplomat
+    opponent_strategies: [diplomat, diplomat, diplomat, diplomat]
+    terminal_peace_reward: 0.0
+    annex_bonus: 100.0
+
+  # ---- peace_heavy reward (encourages diplomacy) ----
+  - name: peace_vs_balanced
+    opponent_strategies: [balanced, balanced, balanced, balanced]
+    terminal_win_reward: 50.0
+    terminal_peace_reward: 200.0
+    annex_bonus: 0.0
+
+  - name: peace_vs_aggressor
+    opponent_strategies: [aggressor, aggressor, aggressor, aggressor]
+    terminal_win_reward: 50.0
+    terminal_peace_reward: 200.0
+    annex_bonus: 0.0
+
+  - name: peace_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    terminal_win_reward: 50.0
+    terminal_peace_reward: 200.0
+    annex_bonus: 0.0
+
+  - name: peace_vs_diplomat
+    opponent_strategies: [diplomat, diplomat, diplomat, diplomat]
+    terminal_win_reward: 50.0
+    terminal_peace_reward: 200.0
+    annex_bonus: 0.0
+
+  # ---------------------------------------------------------------------
+  # Block 2 — reward ablation: fix opponents=diverse, sweep all 5 rewards
+  # (baseline / annex / peace already covered above against diverse, so
+  # we add the missing two: dense_only and terminal_only)
+  # ---------------------------------------------------------------------
+  - name: dense_only_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    dense_reward_scale: 0.05
+    terminal_win_reward: 0.0
+    terminal_peace_reward: 0.0
+    terminal_loss_penalty: 0.0
+    annex_bonus: 0.0
+
+  - name: terminal_only_vs_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    dense_reward_scale: 0.0
+    terminal_win_reward: 100.0
+    terminal_peace_reward: 50.0
+    terminal_loss_penalty: -100.0
+    annex_bonus: 0.0
+
+  # And two extra seeds on the most informative cell (baseline + diverse)
+  # so we can see seed variance for the headline figure.
+  - name: base_vs_diverse_seed1
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    seed: 1
+
+  - name: base_vs_diverse_seed2
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    seed: 2
+
+  # ---------------------------------------------------------------------
+  # Block 3 — long-game cross-check (max_turns 200) on the headline cell
+  # ---------------------------------------------------------------------
+  - name: base_vs_diverse_200t
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    max_turns: 200
+    total_timesteps: 320000   # longer episodes get a 1.6× budget
+
+  - name: annex_vs_diverse_200t
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    max_turns: 200
+    total_timesteps: 320000
+    terminal_peace_reward: 0.0
+    annex_bonus: 100.0

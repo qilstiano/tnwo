@@ -1,0 +1,29 @@
+# Tiny matrix for pipeline smoke testing.
+experiment_name: exp_smoke
+defaults:
+  total_timesteps: 4096
+  num_players: 5
+  learner_id: 0
+  max_turns: 30
+  seed: 0
+  device: cuda
+  checkpoint_freq: 100000
+  n_steps: 1024
+  batch_size: 128
+  policy_hidden_size: 128
+  dense_reward_scale: 0.01
+  terminal_win_reward: 100.0
+  terminal_peace_reward: 50.0
+  terminal_loss_penalty: -100.0
+  annex_bonus: 20.0
+
+runs:
+  - name: smoke_base_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+  - name: smoke_annex_diverse
+    opponent_strategies: [aggressor, turtle, scientist, diplomat]
+    annex_bonus: 100.0
+    terminal_peace_reward: 0.0
+  - name: smoke_peace_balanced
+    opponent_strategies: [balanced, balanced, balanced, balanced]
+    terminal_peace_reward: 200.0

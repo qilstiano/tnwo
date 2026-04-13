@@ -42,7 +42,8 @@ def encode_observation(
 
     learner = state.nations[learner_id]
     features.append(_clip_ratio(state.turn, max_turns))
-    features.append(1.0 if state.turn <= 25 else 0.0)
+    grace_turns = getattr(state, "grace_period_turns", 25)
+    features.append(1.0 if state.turn <= grace_turns else 0.0)
     features.append(_clip_ratio(learner.action_points, learner.max_action_points))
 
     for nation_id in range(num_players):

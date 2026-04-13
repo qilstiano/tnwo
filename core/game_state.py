@@ -5,14 +5,31 @@ from .models import Nation, Achievements
 
 
 class GameState:
-    def __init__(self, num_players: int = 4):
+    def __init__(
+        self,
+        num_players: int = 4,
+        grace_period_turns: int = 25,
+        starting_asymmetry: str = "current",
+        starting_action_points: int = 3,
+    ):
         self.nations: Dict[int, Nation] = {}
         self.turn: int = 1
         self.current_player: int = 0
-        
+
+        # Experimental knobs — stored on the state so downstream consumers
+        # (ActionHandler, AIAgent, rl.encoding) can read them without
+        # needing their own copy of the config.
+        if starting_asymmetry not in ("symmetric", "current", "extreme"):
+            raise ValueError(
+                f"starting_asymmetry must be 'symmetric', 'current', or 'extreme' — got {starting_asymmetry}"
+            )
+        self.grace_period_turns: int = int(grace_period_turns)
+        self.starting_asymmetry: str = starting_asymmetry
+        self.starting_action_points: int = int(starting_action_points)
+
         # Diplomatic matrix: dict of dicts diplomacy[id1][id2] = DiplomaticState
         self.diplomacy: Dict[int, Dict[int, DiplomaticState]] = {}
-        
+
         # Generate some flavor names
         NATION_NAMES = [
             "Dahum", "Maurania", "Darrar", "West Monrassa", "Gabelia", "Esana", "Seabra", "Sirajiya",
@@ -23,20 +40,44 @@ class GameState:
             "Naurava", "Koramea", "Tavea", "Maru Island", "Vareka", "South Pelora", "East Tanoa", "Kalume"
         ]
         PERSONALITIES = ["WARMONGER", "BALANCED", "TECHNOCRAT", "OPPORTUNIST"]
-        
+
         for i in range(num_players):
             name = NATION_NAMES[i % len(NATION_NAMES)]
             colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"]
             color = colors[i % len(colors)]
             pers = random.choice(PERSONALITIES)
-            
+
             n = Nation(id=i, name=name, color=color, personality=pers)
-            
-            # Start with some base yields randomly shifted for asymmetry
-            n.gold_yield = random.randint(10, 20)
-            n.manpower_yield = random.randint(10, 20)
-            n.production_yield = random.randint(2, 8)
-            
+
+            # Apply the selected starting asymmetry. "current" keeps the
+            # original randomised jitter so existing experiments stay
+            # reproducible; "symmetric" hard-pins every nation to the
+            # dataclass defaults; "extreme" doubles nation 0's stats AND
+            # yields so it starts with a clear lead.
+            if starting_asymmetry == "symmetric":
+                # leave dataclass defaults untouched — all nations identical
+                pass
+            elif starting_asymmetry == "extreme":
+                if i == 0:
+                    n.gold = 1000
+                    n.manpower = 400
+                    n.production = 200
+                    n.gold_yield = 30
+                    n.manpower_yield = 100
+                    n.production_yield = 20
+                    n.science_yield = 10
+                    n.civic_yield = 10
+                # others keep the (pinned) defaults so the contrast is clean
+            else:  # "current" — original per-nation randomisation
+                n.gold_yield = random.randint(10, 20)
+                n.manpower_yield = random.randint(10, 20)
+                n.production_yield = random.randint(2, 8)
+
+            # Action budget is a global knob — apply to every nation so
+            # both the learner and the opponents share the same per-turn cap.
+            n.max_action_points = self.starting_action_points
+            n.action_points = self.starting_action_points
+
             self.nations[i] = n
             self.diplomacy[i] = {}
             for j in range(num_players):

@@ -1,0 +1,539 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Wenneker Article
+% LaTeX Template
+% Version 2.0 (28/2/17)
+%
+% This template was downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Authors:
+% Vel (vel@LaTeXTemplates.com)
+% Frits Wenneker
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[11pt, a4paper, onecolumn]{article} % 10pt font size, A4 paper, two column layout
+
+\input{structure.tex} % Specifies the document structure and loads required packages
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE INFORMATION
+%----------------------------------------------------------------------------------------
+
+\title{Neural Nations: 
+Multi-Agent Learning in a Geopolitical Simulator}
+
+\author{
+	\authorstyle{Muhammad A'qil bin Mohd Khalid, Huang Zhuoyan Celeste, Wang Yucheng, Selvaraju Nandita}
+}
+
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\maketitle
+
+\date{\today} 
+
+\thispagestyle{firstpage} 
+
+%----------------------------------------------------------------------------------------
+%	ABSTRACT
+%----------------------------------------------------------------------------------------
+
+\lettrineabstract{Simulating geopolitical competition between sovereign nations presents a challenging environment for artificial intelligence due to asymmetric starting conditions, simultaneous turn resolution, and hidden diplomatic mechanics such as grievance scores. Traditional rule-based agents struggle to adapt to the dynamic interplay of resource harvesting, covert operations, formal warfare, and alliance betrayal that defines emergent state collapse. In this report, we introduce Neural Nations, a reinforcement learning framework in which a single PPO learner competes against a controllable roster of rule-based opponents in a turn-based geopolitical simulator where each nation operates under a constrained action budget of three actions per turn.}
+
+%----------------------------------------------------------------------------------------
+%	ARTICLE CONTENTS
+%----------------------------------------------------------------------------------------
+
+\section{Introduction}
+
+The simulator's state space includes nation-specific yields for gold (an abstraction of our real-world economy), manpower, production, science, and civics (civil and political rights), as well as infrastructure health, technology tier, war exhaustion, and bilateral grievance scores. Actions are queued simultaneously by all agents and resolved in a fixed phase order by the game engine. The order is as follows: global events, diplomacy, economy, hostilities, strikes, and finally defeat or maintenance. This ordering creates nontrivial temporal credit assignment problems, as the consequences of a decision made early in the queue may only manifest after multiple intermediate phases.
+
+The remainder of this report is organised as follows. Section 2 describes the simulation mechanics and state space in detail. Section 3 formulates the multi-agent decision problem. Section 4 presents our experimental setup and baseline algorithms. Section 5 reports results and emergent behaviours. Section 6 concludes with limitations and future work.
+
+\section{Simulation Mechanics}
+
+The simulator manages a state composed of sovereign nations. Each nation possesses resources, yields, technologies, and interpersonal diplomatic statuses. A complete technical specification is provided in Appendix A. In this section, we summarise key mechanics relevant to agent decision-making.
+
+\subsection{Resources and Yields}
+
+Nations accumulate resources passively per turn and can actively harvest them to grant greater yields. The primary resources are Gold (economic currency), Manpower (military recruits), Production (industry capacity), Science (technology research), Civics (policy adoption), Military (army prestige) and Infrastructure Health (nation HP, starting at 100). When Infrastructure Health reaches zero, the nation collapses and is annexed.
+
+Every nation starts with asymmetric randomised base yields: Gold Yield (10-20), Manpower Yield (10-20), Production Yield (2-8), and Science \& Civic Yields fixed at 5.
+
+\subsection{Simultaneous Turn System}
+
+Each turn, a nation receives a maximum of 3 Action Points (AP). Commands are stored in a queue, with up to 3 actions per turn. During turns 1 to 25, a grace period prohibits external interactions (war, alliances, skirmishes, trade) to allow foundational development. At the end of each turn, all queued events are triggered in a specific phase order: Global Events $\rightarrow$ Diplomacy $\rightarrow$ Economy $\rightarrow$ Hostilities $\rightarrow$ Strikes $\rightarrow$ Defeats/Maintenance.
+
+\subsection{Diplomacy Engine}
+
+Pacts require mutual consent. A nation queues \texttt{PROPOSE\_X} while the target queues \texttt{ACCEPT\_X}. Available pacts include Alliances (both gain +150 Manpower), Trade Agreements (both gain +200 Gold), and Research Pacts (both gain +150 Science). Breaking a pact generates Grievance points, a hidden score that can cause alliances to dynamically collapse when a cumulative threshold of 50+ grievances is reached.
+
+\subsection{Conflict and Warfare}
+
+Covert actions bypass formal war declarations but cause massive grievances. \texttt{SABOTAGE} (cost: 50 Gold) causes the target to lose 50 Production, 5 Infrastructure Health, and up to 30 Science, which the attacker steals. \texttt{SKIRMISH} (cost: 20 Manpower) causes the target to lose 40 Manpower, 5 Infrastructure Health, and up to 50 Gold, which the attacker steals. Both actions incur betrayal penalties if performed on an ally.
+
+Formal warfare requires a \texttt{DECLARE\_WAR} action, generating +50 Grievances globally. A \texttt{MILITARY\_\allowbreak STRIKE} costs 100 Manpower and 50 Production (40 with Cannons tech). Damage is calculated using a tech tier advantage multiplier:
+
+\[
+\text{adv} \;=\; \frac{t_A}{t_D} \cdot s_A \cdot d_D,
+\qquad
+s_A = \begin{cases} 1.2 & \text{if attacker has Steel} \\ 1 & \text{otherwise} \end{cases},
+\qquad
+d_D = \begin{cases} 0.8 & \text{if defender has Engineering} \\ 1 & \text{otherwise} \end{cases}
+\]
+
+where $t_A$ and $t_D$ denote the attacker's and defender's tech tier,
+respectively. Steel is therefore an offensive tech applied by the attacker,
+while Engineering is a defensive tech applied by the defender to reduce
+incoming damage. Manpower damage = $150 \times \text{adv} \times (0.8 + \text{rand}(0,0.4))$, and Infrastructure damage = $20 \times \text{adv} \times (0.8 + \text{rand}(0,0.4))$.
+
+\subsection{Annexation and War Exhaustion}
+\label{sec:annexation}
+
+When a nation's Infrastructure Health reaches zero, the last attacking nation claims the territory and permanently adds exactly 50\% of the defeated nation's base yield modifiers to their own generation pool for Gold, Production, and Science. Nations at war accumulate +1 War Exhaustion per turn, imposing a fixed $-0.05$ additive penalty on the Manpower-generation multiplier per exhaustion point, with the overall multiplier clamped to a floor of $0.1$. In peacetime, exhaustion decays by 2 per turn.
+
+\subsection{Win and Loss Conditions}
+
+There are 2 ways that a game is won (or conversely, lost) for a nation, based on some preset conditions. The first way is a \textbf{Domination Victory}. Domination Victories are achieved when there is only country left standing, meaning that all other nations have been defeated through annexation and war. The alternative win state is a \textbf{Peace Victory}. Peace Victories are achieved when there are multiple countries left after the maximum number of rounds in the game have completed.
+
+\section{Multi-Agent Formulation}
+
+We model the geopolitical simulator as a partially observable stochastic game. Let $\mathcal{N} = \{1,\dots,n\}$ be the set of nations. At each turn $t$, each agent $i$ observes a private observation $o_i^t$ derived from the global state $s^t$, selects an action $a_i^t$ from a discrete set $\mathcal{A}$ (subject to the 3-action queue limit), and receives a reward $r_i^t$. The environment transitions according to the fixed phase order and yields a next state $s^{t+1}$.
+
+\subsection{Action Space}
+
+The action space comprises five \texttt{HARVEST} commands (one per resource, yielding burst production), five \texttt{INVEST} commands (each costing 200 Gold for a permanent yield increase), ten \texttt{RESEARCH} choices, five \texttt{PURSUE\_CIVIC} choices, per-opponent \texttt{PROPOSE} and \texttt{ACCEPT} variants for alliances, trade agreements, and research pacts, \texttt{CANCEL\_ALLIANCE}, the covert operations \texttt{SABOTAGE} and \texttt{SKIRMISH}, \texttt{DECLARE\_WAR}, \texttt{MILITARY\_STRIKE}, and per-(ally, enemy) \texttt{PROPOSE\_JOINT\_WAR} and \texttt{ACCEPT\_JOINT\_WAR} proposals. For the $5$-nation configuration used throughout this report, the resulting catalog contains $120$ distinct actions. Agents must learn both action selection and temporal placement within their queue.
+
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Research Questions}
+\label{sec:rqs}
+
+We are researching into how strongly a single PPO learner embedded in a five-nation
+grand-strategy environment is shaped by (i) the opponent ecosystem it trains
+against and (ii) the structure of its reward signal, and whether those choices
+trade off narrow specialization against cross-ecosystem generalization. We
+decompose this into four sub-questions:
+
+\begin{itemize}
+    \item \textbf{RQ1 (Specialization).} Does a policy trained against a
+          homogeneous opponent pool exploit that pool, and how hard does it
+          fall over on other pools?
+    \item \textbf{RQ2 (Reward shaping).} Given a fixed opponent pool, how does
+          reward design change the \emph{kind} of strategy the learner
+          converges to, not just its win rate?
+    \item \textbf{RQ3 (Behavior vs.\ scoreboard).} Can two policies with
+          comparable win rates follow qualitatively different action
+          distributions?
+    \item \textbf{RQ4 (Seed variance).} How much of the observed behavior is
+          signal rather than seed noise at $200$k training steps?
+\end{itemize}
+
+\subsection{Experimental Setup}
+\label{sec:setup}
+
+A single PPO learner controls one nation out of five. It observes a
+$196$-dimensional symbolic encoding and selects from a $120$-action discrete
+catalog gated by an action mask, so illegal actions (e.g.\ declaring war
+during the $25$-turn grace period) are never sampled. We use the
+\texttt{MaskablePPO} implementation from \texttt{sb3-contrib} with a two-layer
+MLP policy ($256$ hidden units), $n_{\text{steps}}{=}2048$, batch size $256$,
+$\gamma{=}0.99$, GAE $\lambda{=}0.95$, clip range $0.2$, entropy coefficient
+$0.01$, learning rate $3{\times}10^{-4}$, and $200$k environment steps per
+run (default horizon $T_{\max}{=}100$ turns). All four opponents are
+rule-based; no learning opponents or LLM agents are used, isolating the effect
+of opponent \emph{strategy} from opponent \emph{capability}.
+
+\subsection{Rule-Based Opponent Library}
+\label{sec:opponents}
+
+We extend a single heuristic agent into six profiles by overriding a small
+set of decision thresholds (war turn, manpower / production gates, invest
+threshold, harvest priority, diplomacy skip flags). Each profile realizes a
+distinct theory of how to win.
+
+\begin{center}
+\small
+\begin{tabular}{lp{11.5cm}}
+\toprule
+\textbf{Strategy} & \textbf{Key Behaviors} \\
+\midrule
+\textbf{balanced}   & Baseline heuristic; runs all five decision phases unchanged. \\
+\textbf{aggressor}  & Skips diplomacy, declares war as early as turn $20$, drops the military-tech prerequisite, biases harvests toward manpower / production. \\
+\textbf{turtle}     & Never attacks, accepts every alliance, invests aggressively at low gold thresholds. \\
+\textbf{scientist}  & Skips military, prioritizes research and civic harvests, double-passes research-pact proposals. \\
+\textbf{trader}     & Skips military, double-passes trade pacts, channels surplus gold into permanent yield boosts. \\
+\textbf{diplomat}   & Skips military, proposes and accepts every alliance, aims for peace victory. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Four of these (\texttt{aggressor}, \texttt{turtle}, \texttt{scientist},
+\texttt{diplomat}) are used to build opponent pools; \texttt{balanced}
+doubles as an ecosystem and an evaluation suite; \texttt{trader} is kept
+in the library but unused here.
+
+\subsection{Three-Axis Experimental Matrix}
+\label{sec:matrix}
+
+We sweep three orthogonal axes.
+
+\paragraph{Axis A: opponent composition.}
+Four fixed opponent pools:
+\textsc{homo-balanced} (four \texttt{balanced}),
+\textsc{homo-aggressor} (four \texttt{aggressor}),
+\textsc{mixed-diverse} (one each of
+\texttt{aggressor}, \texttt{turtle}, \texttt{scientist}, \texttt{diplomat}),
+\textsc{homo-diplomat} (four \texttt{diplomat}). These four pools double as
+evaluation suites (Section~\ref{sec:eval}).
+
+\paragraph{Axis B: reward shaping.}
+Five variants sweeping the dense scale and terminal / annex bonus structure
+(Table~\ref{tab:rewards}).
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Variant & $\alpha_{\text{dense}}$ & $r_{\text{win}}$ & $r_{\text{peace}}$ &
+$r_{\text{loss}}$ & $r_{\text{annex}}$ \\
+\midrule
+\textsc{baseline}      & $0.01$ & $100$ & $50$  & $-100$ & $20$  \\
+\textsc{dense-only}    & $0.05$ & $0$   & $0$   & $0$    & $0$   \\
+\textsc{terminal-only} & $0.00$ & $100$ & $50$  & $-100$ & $0$   \\
+\textsc{annex-heavy}   & $0.01$ & $100$ & $0$   & $-100$ & $100$ \\
+\textsc{peace-heavy}   & $0.01$ & $50$  & $200$ & $-100$ & $0$   \\
+\bottomrule
+\end{tabular}
+\caption{Reward variants. $\alpha_{\text{dense}}$ scales per-turn score delta;
+terminal bonuses fire at episode end; $r_{\text{annex}}$ fires per opponent
+annexation.}
+\label{tab:rewards}
+\end{table}
+
+\paragraph{Axis C: training horizon.}
+$T_{\max}{=}100$ by default, plus two runs at $T_{\max}{=}200$ with a
+proportionally larger training budget ($320$k vs.\ $200$k steps) to probe
+whether longer horizons induce qualitatively different strategies.
+
+\paragraph{Run schedule.}
+Rather than the full $4{\times}5{\times}2$ product, we use a budget-aware
+design totaling $18$ runs:
+
+\begin{itemize}
+    \item \textbf{Main grid (12):} four opponent pools $\times$ three reward
+          variants (\textsc{baseline}, \textsc{annex-heavy}, \textsc{peace-heavy}),
+          $T_{\max}{=}100$.
+    \item \textbf{Reward ablation (2):} \textsc{dense-only} and
+          \textsc{terminal-only} against \textsc{mixed-diverse}, completing
+          the five-way reward sweep at the headline cell.
+    \item \textbf{Seed variance (2):} two additional seeds of
+          \textsc{baseline}+\textsc{mixed-diverse}.
+    \item \textbf{Long horizon (2):} \textsc{baseline} and \textsc{annex-heavy}
+          against \textsc{mixed-diverse} at $T_{\max}{=}200$.
+\end{itemize}
+
+All runs share the same network, optimizer, and learner index ($0$), and are
+dispatched in parallel across four GPUs.
+
+\subsection{Evaluation Protocol}
+\label{sec:eval}
+
+Every trained policy is evaluated against the same battery of four suites:
+\textsc{vs-balanced}, \textsc{vs-aggressor}, \textsc{vs-diverse},
+\textsc{vs-diplomat}. For each suite we run $20$ deterministic episodes
+(greedy policy, action masking, fixed seed schedule). Evaluation suites are
+decoupled from training pools, so a policy trained on one ecosystem is
+tested on all four --- directly exposing overfitting (RQ1). For the strategy
+fingerprint (Section~\ref{sec:rq2}) we additionally play $5$ deterministic
+episodes per (policy, suite) cell and tally the chosen actions into four
+semantic categories:
+\textit{aggression} (\texttt{DECLARE\_WAR}, \texttt{MILITARY\_STRIKE},
+\texttt{SKIRMISH}, \texttt{SABOTAGE}, \texttt{HARVEST MANPOWER},
+\texttt{INVEST MILITARY}),
+\textit{science} (\texttt{RESEARCH}, \texttt{PURSUE\_CIVIC},
+\texttt{HARVEST SCIENCE}, \texttt{HARVEST CIVICS},
+\texttt{INVEST SCIENCE}, \texttt{INVEST CIVICS},
+\texttt{PROPOSE\_RESEARCH}, \texttt{ACCEPT\_RESEARCH}),
+\textit{economy} (\texttt{HARVEST GOLD}, \texttt{HARVEST PRODUCTION},
+\texttt{INVEST INDUSTRY}, \texttt{INVEST MANPOWER},
+\texttt{PROPOSE\_TRADE}, \texttt{ACCEPT\_TRADE}), and
+\textit{diplomacy} (\texttt{PROPOSE\_ALLIANCE}, \texttt{ACCEPT\_ALLIANCE}).
+Ties in category membership are resolved by the enumeration order above, so
+trade and research-pact proposals are counted exactly once, under economy
+and science respectively, and never double-counted under diplomacy.
+
+\subsection{Results}
+\label{sec:results}
+
+All numbers below are averaged over $20$ deterministic seeds per (policy,
+suite) cell; fingerprints average $5$ episodes per cell. $\bar{w}$ denotes a
+policy's mean win rate across the four evaluation suites.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/training_curves_pub.pdf}
+\caption{Rolling-$20$ win rate, return, and final score for all $18$ runs,
+colored by reward family. The three \textsc{baseline}+\textsc{mixed-diverse}
+seeds appear as a single band on the rightmost cluster.}
+\label{fig:training_curves}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\vspace{-4cm}  % or \vspace{-\baselineskip}
+\includegraphics[width=\linewidth]{figures/eval_heatmap_pub.pdf}
+\caption{Generalization heatmap. Rows = trained policies (grouped by reward
+family, labeled by training opponent); columns = deterministic evaluation
+suites; cell = win rate over $20$ episodes. Rightmost column is the row
+mean $\bar{w}$.}
+\label{fig:eval_heatmap}
+\vspace{-0.5cm}
+\end{figure}
+
+\subsubsection{RQ1 --- The aggressor wall and the diversity effect}
+\label{sec:rq1}
+
+Table~\ref{tab:winrate_summary} reports every cell of
+Fig.~\ref{fig:eval_heatmap}. Three patterns dominate.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lcccc|c}
+\toprule
+Policy & vs-bal & vs-agg & vs-div & vs-dip & $\bar{w}$ \\
+\midrule
+\textsc{dense-only}$_{\text{div}}$       & $1.00$ & $0.05$ & $0.65$ & $1.00$ & $\mathbf{0.68}$ \\
+\textsc{peace}$_{\text{bal}}$            & $1.00$ & $0.15$ & $0.45$ & $1.00$ & $0.65$ \\
+\textsc{annex}$_{\text{div}}$            & $0.90$ & $0.00$ & $0.55$ & $1.00$ & $0.61$ \\
+\textsc{base}$_{\text{agg}}$             & $0.85$ & $0.20$ & $0.20$ & $0.95$ & $0.55$ \\
+\textsc{annex}$_{\text{bal}}$            & $1.00$ & $0.10$ & $0.00$ & $1.00$ & $0.53$ \\
+\textsc{base}$_{\text{dip}}$             & $1.00$ & $0.10$ & $0.00$ & $1.00$ & $0.53$ \\
+\textsc{base}$_{\text{div,seed1}}$       & $0.00$ & $0.10$ & $0.95$ & $1.00$ & $0.51$ \\
+\textsc{peace}$_{\text{dip}}$            & $1.00$ & $0.05$ & $0.00$ & $1.00$ & $0.51$ \\
+\textsc{peace}$_{\text{div}}$            & $0.00$ & $0.00$ & $0.85$ & $1.00$ & $0.46$ \\
+\textsc{base}$_{\text{div,seed2}}$       & $0.00$ & $0.00$ & $0.75$ & $1.00$ & $0.44$ \\
+\textsc{base}$_{\text{bal}}$             & $0.75$ & $0.05$ & $0.00$ & $0.85$ & $0.41$ \\
+\textsc{base}$_{\text{div}}$             & $0.00$ & $0.10$ & $0.50$ & $1.00$ & $0.40$ \\
+\textsc{base}$_{\text{div,200t}}$        & $0.00$ & $0.00$ & $0.55$ & $1.00$ & $0.39$ \\
+\textsc{peace}$_{\text{agg}}$            & $0.15$ & $0.10$ & $0.00$ & $0.25$ & $0.12$ \\
+\textsc{annex}$_{\text{div,200t}}$       & $0.00$ & $0.00$ & $0.30$ & $0.20$ & $0.12$ \\
+\textsc{terminal-only}$_{\text{div}}$    & $0.00$ & $0.00$ & $0.05$ & $0.15$ & $0.05$ \\
+\textsc{annex}$_{\text{agg}}$            & $0.00$ & $0.10$ & $0.00$ & $0.05$ & $0.04$ \\
+\textsc{annex}$_{\text{dip}}$            & $0.00$ & $0.00$ & $0.00$ & $0.00$ & $0.00$ \\
+\bottomrule
+\end{tabular}
+\caption{Win rate of every policy on every suite ($20$ episodes per cell).
+Subscripts denote training pool: \textit{bal}, \textit{agg}, \textit{div},
+\textit{dip}. Rows sorted by $\bar{w}$.}
+\label{tab:winrate_summary}
+\end{table}
+
+\paragraph{(i) The \textsc{vs-aggressor} column is a wall.}
+No policy exceeds $0.20$ on \textsc{vs-aggressor} and the column mean is
+$0.065$. Four simultaneous \texttt{aggressor}s who declare war as early as
+turn $20$ simply overwhelm a single learner; even training on aggressors does
+not help (\textsc{base}$_{\text{agg}}$ matches the $0.20$ global ceiling).
+The strong form of RQ1 (``training on $X$ helps you beat $X$'') is
+\emph{falsified} for the \texttt{aggressor} ecosystem.
+
+\paragraph{(ii) Specialization splits the remaining policies into three bands.}
+\begin{itemize}
+    \item \emph{Soft-suite specialists} (\textsc{annex}$_{\text{bal}}$,
+          \textsc{base}$_{\text{dip}}$, \textsc{peace}$_{\text{dip}}$): score
+          $1.00$ on \textsc{vs-balanced} and \textsc{vs-diplomat} but $0.00$
+          on \textsc{vs-diverse}. The exploit transfers between the two
+          passive suites but breaks the moment one \texttt{aggressor} or
+          \texttt{turtle} appears.
+    \item \emph{Diverse specialists} (all three \textsc{base}$_{\text{div}}$
+          seeds, \textsc{peace}$_{\text{div}}$): $0.75$--$0.95$ on
+          \textsc{vs-diverse}, $1.00$ on \textsc{vs-diplomat}, but $0.00$ on
+          \textsc{vs-balanced}. The policies expect one specific
+          aggressor-shaped neighbor that never appears in a homogeneous
+          balanced pool.
+    \item \emph{Cross-suite survivors}
+          (\textsc{dense-only}$_{\text{div}}$, \textsc{peace}$_{\text{bal}}$,
+          \textsc{annex}$_{\text{div}}$, \textsc{base}$_{\text{agg}}$): the
+          only runs with $\bar{w}>0.55$. Their training opponents were either
+          diverse or aggressive --- i.e.\ no single exploit existed.
+\end{itemize}
+
+\paragraph{(iii) Diversity beats difficulty.}
+The usual advice --- train against the hardest opponent --- fails here.
+\textsc{base}$_{\text{agg}}$ is the best \textsc{vs-aggressor} performer but
+is beaten on $\bar{w}$ by three runs that never saw aggressors, including the
+winner \textsc{dense-only}$_{\text{div}}$. Against an asymmetric rule-based
+library, ecosystem \emph{diversity} predicts generalization better than
+ecosystem \emph{difficulty}.
+
+\subsubsection{RQ2 --- Reward shaping rewrites the policy, not just its score}
+\label{sec:rq2}
+
+Fig.~\ref{fig:fingerprint_full} reports the action-category fingerprint for
+every (policy, suite) cell.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/fingerprint_grid_pub.pdf}
+\caption{Full $18{\times}4$ fingerprint. Each policy occupies a group of four
+bars, one per evaluation suite. Tick colors encode reward family. Policies
+whose bars shift across suites are \emph{reactive}; those whose bars are
+identical across suites are \emph{rigid}.}
+\label{fig:fingerprint_full}
+\end{figure}
+
+\paragraph{(i) \textsc{annex-heavy} is the \emph{most science-dominated} family.}
+Every \textsc{annex-heavy} policy runs $0.82$--$0.93$ of its actions through
+\texttt{RESEARCH}, \texttt{PURSUE\_CIVIC}, and science harvests on
+\textsc{vs-aggressor} and \textsc{vs-diplomat}; aggression stays at
+$0.01$--$0.25$. Within this environment, annexations are obtained by
+tech-rushing to a military unlock, and PPO collapses onto that indirect
+route. The reward \emph{names} the target outcome; the policy finds the cheapest causal route, and the cheapest route is not the lexically obvious
+one.
+
+\paragraph{(ii) \textsc{peace-heavy} against diplomats becomes a pure aggressor.}
+\textsc{peace}$_{\text{dip}}$ runs $0.61$--$0.82$ aggression on every
+evaluation suite --- higher than any \textsc{annex-heavy} row. Four
+\texttt{diplomat} opponents never retaliate, so the $r_{\text{peace}}{=}200$
+bonus is attainable by killing everyone cheaply and then settling down. The
+reward meant to encourage diplomacy has produced its own bloodless-conquest
+exploit. The win-rate row ($1.00/0.05/0.00/1.00$) shows the exploit is
+completely non-transferable.
+
+\paragraph{(iii) Against \textsc{homo-aggressor}, everyone runs to science.}
+$16$ of $18$ policies allocate $64$--$93\%$ of their actions to science on
+\textsc{vs-aggressor}. This is not learned preference but masked behavior:
+once war breaks out and resources drain, the action mask eliminates most
+economy / diplomacy options, and science remains the dominant legal choice.
+The $0.065$ average win rate is consistent --- the learner loses not because
+it chose wrong but because its only remaining legal actions cannot matter
+in time.
+
+\paragraph{(iv) \textsc{dense-only} has the flattest fingerprint and the best $\bar{w}$.}
+\textsc{dense-only}$_{\text{div}}$ ($\alpha_{\text{dense}}{=}0.05$, no
+terminal / annex bonuses) attains $\bar{w}{=}0.68$ --- the highest in the
+matrix --- with a roughly $50$/$50$ science / economy mix on
+\textsc{vs-balanced} and no collapse on the other three suites.
+\textsc{terminal-only}$_{\text{div}}$ sits at the opposite extreme with
+$\bar{w}{=}0.05$, cleanly bracketing the reward axis: \emph{removing}
+structurally exploitable terminal bonuses produced the most generalizable
+policy in the study.
+
+\subsubsection{RQ3 --- Win-rate ties hide strategy disparity}
+\label{sec:rq3}
+
+Three policies achieve exactly $1.00/0.10/0.00/1.00$ on the heatmap:
+\textsc{annex}$_{\text{bal}}$, \textsc{base}$_{\text{dip}}$, and
+\textsc{peace}$_{\text{dip}}$. Their fingerprints disagree completely ---
+\textsc{annex}$_{\text{bal}}$ is science-leaning ($0.43$--$0.87$ science),
+\textsc{base}$_{\text{dip}}$ is strongly aggressive ($0.26$--$0.89$
+aggression on three suites), and \textsc{peace}$_{\text{dip}}$ is
+aggression-dominated across \emph{all} four suites. Three different reward
+families, three different training pools, and one indistinguishable heatmap
+row, yet three distinct theories of the game. The generalization heatmap and
+the action fingerprint carry independent information, and evaluation
+protocols that track only win rate will mislabel qualitatively different
+learners as equivalent.
+
+\subsubsection{RQ4 --- Seed variance is directional, not magnitudinal}
+\label{sec:rq4}
+
+The three \textsc{baseline}+\textsc{mixed-diverse} seeds yield:
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Seed & vs-bal & vs-agg & vs-div & vs-dip \\
+\midrule
+seed $0$ & $0.00$ & $0.10$ & $0.50$ & $1.00$ \\
+seed $1$ & $0.00$ & $0.10$ & $0.95$ & $1.00$ \\
+seed $2$ & $0.00$ & $0.00$ & $0.75$ & $1.00$ \\
+\midrule
+mean     & $0.00$ & $0.07$ & $\mathbf{0.73}$ & $1.00$ \\
+s.d.     & $0.00$ & $0.06$ & $\mathbf{0.23}$ & $0.00$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three of four columns are essentially noise-free ($\sigma{\leq}0.06$): the
+overfitting pattern (collapse on \textsc{vs-balanced} / \textsc{vs-aggressor},
+sweep on \textsc{vs-diplomat}) is seed-stable. The fourth column ---
+\textsc{vs-diverse}, the suite that matches training --- spans
+$0.50$--$0.95$ ($\sigma{=}0.23$), telling us how much headroom PPO had left
+at $200$k steps. Qualitative claims in this paper are seed-robust, but the
+absolute win rate on the training suite should be read as $0.7 \pm 0.2$,
+not a point estimate.
+
+\subsubsection{Axis C --- Long-horizon runs}
+\label{sec:rq5}
+
+$T_{\max}{=}200$ does not produce qualitatively new behavior: the two runs
+track their $T_{\max}{=}100$ counterparts in both fingerprint and win-rate
+pattern ($\bar{w}{=}0.39$ and $0.12$). The long horizon does appear to hurt
+\textsc{annex}$_{\text{div}}$ on \textsc{vs-diplomat} ($1.00{\to}0.20$), as
+diplomats gain more turns to build alliances that block late-game annexation.
+With only two runs on this axis, we flag this as a hint rather than a claim,
+and defer a proper sweep to the extended matrix.
+
+\subsection{Headline Takeaways}
+\label{sec:summary}
+
+\begin{enumerate}
+    \item A specific rule-based ecosystem can be unwinnable regardless of
+          reward or training distribution: four homogeneous
+          \texttt{aggressor}s cap every policy in our sweep at
+          $w{\leq}0.20$ (RQ1).
+    \item Ecosystem diversity beats ecosystem difficulty for training. The
+          best policy by $\bar{w}$ is \textsc{dense-only}$_{\text{div}}$
+          ($\bar{w}{=}0.68$), and it never saw aggressors (RQ1).
+    \item Reward shaping rewrites the action distribution in counter-intuitive
+          ways: \textsc{annex-heavy} produces the most science-oriented
+          policies, \textsc{peace-heavy} vs.\ diplomats produces the most
+          aggressive policy in the matrix. PPO finds the cheapest causal
+          route to the named reward, not the lexical one (RQ2).
+    \item Three heatmap-identical policies have three disjoint fingerprints
+          --- win-rate-only evaluation mislabels different learners as
+          equivalent (RQ3).
+    \item Seeds agree on direction, disagree on magnitude. We report bands,
+          not point estimates (RQ4).
+    \item The clearest positive design lesson: for transfer across rule-based
+          ecosystems, remove structurally exploitable terminal / annex bonuses
+          and let the per-turn score delta be the gradient signal.
+\end{enumerate}
+
+
+
+
+\section{Discussion}
+
+% TODO: expand Discussion with narrative pulled from Section~\ref{sec:experiments}
+% (aggressor wall, diversity-over-difficulty, reward-driven strategy rewrites,
+% heatmap-identical policies with disjoint fingerprints).
+
+\section{Conclusion and Future Work}
+
+We introduced Neural Nations, a multi-agent RL framework for a simultaneous-turn geopolitical simulator. Our preliminary results suggest that grievance mechanics and phase-ordered resolution produce rich strategic behavior. Future work includes opponent shaping, communication protocols for alliance negotiation, and transfer learning across asymmetric starting conditions.
+
+%----------------------------------------------------------------------------------------
+%	BIBLIOGRAPHY
+%----------------------------------------------------------------------------------------
+
+\printbibliography[title={Bibliography}]
+
+%----------------------------------------------------------------------------------------
+
+\end{document}

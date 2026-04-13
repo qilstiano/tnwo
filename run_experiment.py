@@ -102,6 +102,8 @@ def build_parser():
                    help="LLM sampling temperature (default: 0.7)")
     p.add_argument("-v", "--verbose", action="store_true",
                    help="print per-turn event logs")
+    p.add_argument("--mode", choices=["llm", "rulebased"], default="llm",
+                   help="agent mode: llm or rulebased (default: llm)")
     p.add_argument("--gen-config", action="store_true",
                    help="print example config JSON to stdout and exit")
     return p
@@ -125,6 +127,7 @@ def resolve_config(args):
         "seed":        pick(args.seed,         "seed",        None),
         "temperature": pick(args.temperature,  "temperature", 0.7),
         "output":      pick(args.output,       "output",      "game_export.jsonl"),
+        "mode":        pick(args.mode,        "mode",        "llm"),
         "verbose":     args.verbose or cfg.get("verbose", False),
         "backends":            cfg.get("backends", None),
         "nation_backend_map":  cfg.get("nation_backend_map", None),
@@ -136,7 +139,7 @@ def apply_config_to_module(cfg):
     """Patch ai.config module attributes BEFORE the game is imported."""
     import ai.config as ai_cfg
 
-    ai_cfg.AI_MODE = "llm"
+    ai_cfg.AI_MODE = cfg["mode"]
     ai_cfg.LLM_TEMPERATURE = cfg["temperature"]
 
     if cfg["backends"] is not None:
@@ -220,13 +223,14 @@ def run_game_loop(game, cfg):
                         f"[INTENT] {nation_name}: {agent.last_reasoning}"
                     )
 
-        # --- Snapshot for export ---
-        state_snapshot = {"turn": current_turn, "agents": {}}
+        # --- Pre-resolution snapshot for export ---
+        state_snapshot = {"turn": current_turn, "phase": "pre", "agents": {}}
         for nid, n in game.state.nations.items():
             agent = game.agents.get(nid)
             agent_meta = {
                 "state": game.state.get_symbolic_state(nid),
                 "queued_actions": list(n.queued_actions),
+                "reasoning": getattr(agent, "last_reasoning", ""),
             }
             if hasattr(agent, "backend_id") and agent.backend_id:
                 agent_meta["backend_id"] = agent.backend_id
@@ -239,6 +243,15 @@ def run_game_loop(game, cfg):
         # --- Resolve turn ---
         resolved_logs = game.handler.resolve_simultaneous_turn()
         logs = intent_logs + resolved_logs
+
+        # --- Post-resolution snapshot ---
+        post_snapshot = {"turn": current_turn, "phase": "post", "agents": {}}
+        for nid, n in game.state.nations.items():
+            post_snapshot["agents"][nid] = {
+                "state": game.state.get_symbolic_state(nid),
+            }
+        with open(output_path, "a") as f:
+            f.write(json.dumps(post_snapshot, cls=GameEncoder) + "\n")
 
         elapsed = time.time() - t0
         resolved_turn = game.state.turn - 1

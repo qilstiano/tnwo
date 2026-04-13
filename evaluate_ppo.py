@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluate a trained PPO nation policy against rule-based opponents.
+Evaluate a trained PPO nation policy against opponents (rule-based or LLM).
 """
 
 from __future__ import annotations
@@ -25,6 +25,34 @@ def parse_args():
     parser.add_argument("--max-turns", type=int, default=100)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument(
+        "--opponents-mode",
+        choices=["rulebased", "llm"],
+        default="rulebased",
+        help="Opponent type: rulebased (AIAgent) or llm (LLMAgent via ai/config.py backends)",
+    )
+    parser.add_argument(
+        "--llm-temperature",
+        type=float,
+        default=None,
+        help="Override ai.config.LLM_TEMPERATURE for LLM opponents",
+    )
+    parser.add_argument(
+        "--shared-llm-provider",
+        choices=["vllm", "ollama"],
+        default=None,
+        help="Use one shared LLM backend for all opponents",
+    )
+    parser.add_argument(
+        "--shared-llm-base-url",
+        default=None,
+        help="Shared backend base URL, e.g. http://localhost:8001",
+    )
+    parser.add_argument(
+        "--shared-llm-model",
+        default=None,
+        help="Shared backend served model name",
+    )
     parser.add_argument("--output-json", default=None, help="Optional path to save aggregated metrics")
     return parser.parse_args()
 
@@ -33,8 +61,62 @@ def mask_fn(env):
     return env.action_masks()
 
 
+def _build_llm_opponent_backends(num_players: int, learner_id: int):
+    """
+    Build per-nation backend configs for NationEnv(opponent_mode='llm') using ai/config.py.
+    Only opponents (nid != learner_id) are included.
+    """
+    from ai.config import LLM_BACKENDS, NATION_BACKEND_MAP
+
+    nation_backends = {}
+    for nid in range(num_players):
+        if nid == learner_id:
+            continue
+        pool_id = NATION_BACKEND_MAP.get(nid)
+        if not pool_id:
+            continue
+        cfg = LLM_BACKENDS.get(pool_id)
+        if not cfg:
+            continue
+        nation_backends[nid] = {
+            "provider": cfg["provider"],
+            "base_url": cfg["base_url"],
+            "model": cfg["model"],
+            "backend_id": pool_id,
+        }
+    return nation_backends
+
+
 def main():
     args = parse_args()
+
+    if args.llm_temperature is not None:
+        import ai.config as ai_cfg
+
+        ai_cfg.LLM_TEMPERATURE = float(args.llm_temperature)
+
+    nation_backends = None
+    if args.opponents_mode == "llm":
+        use_shared = (
+            args.shared_llm_provider is not None
+            and args.shared_llm_base_url is not None
+            and args.shared_llm_model is not None
+        )
+        if use_shared:
+            nation_backends = {}
+            for nid in range(args.num_players):
+                if nid == args.learner_id:
+                    continue
+                nation_backends[nid] = {
+                    "provider": args.shared_llm_provider,
+                    "base_url": args.shared_llm_base_url,
+                    "model": args.shared_llm_model,
+                    "backend_id": "shared",
+                }
+        else:
+            nation_backends = _build_llm_opponent_backends(
+                num_players=args.num_players, learner_id=args.learner_id
+            )
 
     env = ActionMasker(
         NationEnv(
@@ -42,6 +124,8 @@ def main():
             learner_id=args.learner_id,
             max_turns=args.max_turns,
             seed=args.seed,
+            opponent_mode=args.opponents_mode,
+            nation_backends=nation_backends,
         ),
         mask_fn,
     )

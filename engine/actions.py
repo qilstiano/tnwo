@@ -45,9 +45,12 @@ class ActionHandler:
             if len(parts) < 2 or parts[1].upper() not in ["MANPOWER", "INDUSTRY", "SCIENCE", "CIVICS", "MILITARY"]: return False
             if self.state.nations[player_id].gold < 200: return False
                 
-        # 25-Turn Grace Period: Block external operations
+        # Grace Period: Block external operations for the configured
+        # number of turns (default 25, but can be varied per experiment
+        # via GameState.grace_period_turns).
         foreign_cmds = ["DECLARE_WAR", "MILITARY_STRIKE", "PROPOSE_ALLIANCE", "ACCEPT_ALLIANCE", "CANCEL_ALLIANCE", "SABOTAGE", "SKIRMISH", "PROPOSE_TRADE", "ACCEPT_TRADE", "PROPOSE_RESEARCH", "ACCEPT_RESEARCH", "PROPOSE_JOINT_WAR", "ACCEPT_JOINT_WAR"]
-        if self.state.turn <= 25 and cmd in foreign_cmds:
+        grace_turns = getattr(self.state, "grace_period_turns", 25)
+        if self.state.turn <= grace_turns and cmd in foreign_cmds:
             return False
 
         nation.queued_actions.append(command.strip())

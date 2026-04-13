@@ -1,0 +1,59 @@
+{
+  "run_name": "base_vs_diverse_seed2",
+  "run_dir": "outputs/exp_main/base_vs_diverse_seed2",
+  "train_config": {
+    "opponent_strategies": [
+      "aggressor",
+      "turtle",
+      "scientist",
+      "diplomat"
+    ],
+    "dense_reward_scale": 0.01,
+    "terminal_win_reward": 100.0,
+    "terminal_peace_reward": 50.0,
+    "terminal_loss_penalty": -100.0,
+    "annex_bonus": 20.0,
+    "max_turns": 100,
+    "total_timesteps": 200000,
+    "seed": 2
+  },
+  "eval_episodes": 20,
+  "eval": {
+    "vs_balanced": {
+      "episodes": 20,
+      "win_rate": 0.0,
+      "peace_win_rate": 0.0,
+      "loss_rate": 1.0,
+      "avg_reward": -57.081,
+      "avg_final_score": 4991.9,
+      "std_final_score": 268.459661774353
+    },
+    "vs_aggressor": {
+      "episodes": 20,
+      "win_rate": 0.0,
+      "peace_win_rate": 0.0,
+      "loss_rate": 1.0,
+      "avg_reward": -75.1365,
+      "avg_final_score": 3286.35,
+      "std_final_score": 965.213047725734
+    },
+    "vs_diverse": {
+      "episodes": 20,
+      "win_rate": 0.75,
+      "peace_win_rate": 0.0,
+      "loss_rate": 0.25,
+      "avg_reward": 201.90700000000004,
+      "avg_final_score": 10390.7,
+      "std_final_score": 4737.79374920437
+    },
+    "vs_diplomat": {
+      "episodes": 20,
+      "win_rate": 1.0,
+      "peace_win_rate": 0.0,
+      "loss_rate": 0.0,
+      "avg_reward": 385.2635,
+      "avg_final_score": 28726.35,
+      "std_final_score": 2059.527573862511
+    }
+  }
+}

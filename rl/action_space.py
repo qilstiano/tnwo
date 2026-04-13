@@ -123,7 +123,8 @@ def is_action_valid(state: GameState, player_id: int, spec: ActionSpec) -> bool:
     if spec.command_type == "PURSUE_CIVIC":
         return nation.current_civic is None and spec.value not in nation.unlocked_civics
 
-    if spec.is_foreign and state.turn <= 25:
+    grace_turns = getattr(state, "grace_period_turns", 25)
+    if spec.is_foreign and state.turn <= grace_turns:
         return False
 
     if spec.command_type in SINGLE_TARGET_ACTIONS:

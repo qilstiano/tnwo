@@ -1,0 +1,150 @@
+{
+  "experiment_name": "exp_main",
+  "completed_at": "2026-04-10 08:42:13",
+  "results": [
+    {
+      "name": "dense_only_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 3563.8,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/dense_only_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/dense_only_vs_diverse/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "base_vs_balanced",
+      "returncode": 0,
+      "elapsed_sec": 3567.9,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_balanced",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_balanced/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "annex_vs_balanced",
+      "returncode": 0,
+      "elapsed_sec": 3569.1,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_balanced",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_balanced/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "peace_vs_balanced",
+      "returncode": 0,
+      "elapsed_sec": 3569.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_balanced",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_balanced/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "base_vs_diverse_seed2",
+      "returncode": 0,
+      "elapsed_sec": 4086.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_seed2",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_seed2/train.log",
+      "gpu": 3
+    },
+    {
+      "name": "peace_vs_diplomat",
+      "returncode": 0,
+      "elapsed_sec": 4095.7,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_diplomat",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_diplomat/train.log",
+      "gpu": 3
+    },
+    {
+      "name": "base_vs_diplomat",
+      "returncode": 0,
+      "elapsed_sec": 4096.5,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diplomat",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diplomat/train.log",
+      "gpu": 3
+    },
+    {
+      "name": "annex_vs_diplomat",
+      "returncode": 0,
+      "elapsed_sec": 4100.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diplomat",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diplomat/train.log",
+      "gpu": 3
+    },
+    {
+      "name": "peace_vs_aggressor",
+      "returncode": 0,
+      "elapsed_sec": 4410.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_aggressor",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_aggressor/train.log",
+      "gpu": 1
+    },
+    {
+      "name": "annex_vs_aggressor",
+      "returncode": 0,
+      "elapsed_sec": 4412.7,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_aggressor",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_aggressor/train.log",
+      "gpu": 1
+    },
+    {
+      "name": "terminal_only_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 4415.9,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/terminal_only_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/terminal_only_vs_diverse/train.log",
+      "gpu": 1
+    },
+    {
+      "name": "base_vs_aggressor",
+      "returncode": 0,
+      "elapsed_sec": 4438.2,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_aggressor",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_aggressor/train.log",
+      "gpu": 1
+    },
+    {
+      "name": "peace_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 4756.3,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/peace_vs_diverse/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "annex_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 4757.8,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diverse/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "base_vs_diverse",
+      "returncode": 0,
+      "elapsed_sec": 4758.1,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "base_vs_diverse_seed1",
+      "returncode": 0,
+      "elapsed_sec": 4759.0,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_seed1",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_seed1/train.log",
+      "gpu": 2
+    },
+    {
+      "name": "base_vs_diverse_200t",
+      "returncode": 0,
+      "elapsed_sec": 3661.6,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_200t",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/base_vs_diverse_200t/train.log",
+      "gpu": 0
+    },
+    {
+      "name": "annex_vs_diverse_200t",
+      "returncode": 0,
+      "elapsed_sec": 4445.4,
+      "output_dir": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diverse_200t",
+      "log": "/home/zhiyuan/yc/tnwo/outputs/exp_main/annex_vs_diverse_200t/train.log",
+      "gpu": 1
+    }
+  ]
+}

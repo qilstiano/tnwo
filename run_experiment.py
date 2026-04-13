@@ -237,17 +237,11 @@ def run_game_loop(game, cfg):
             f.write(json.dumps(state_snapshot, cls=GameEncoder) + "\n")
 
         # --- Resolve turn ---
-        logs = game.handler.resolve_simultaneous_turn()
-        logs = intent_logs + logs
-
-        # --- Feed memory ---
-        resolved_turn = game.state.turn - 1
-        for ai in ai_players:
-            agent = game.agents.get(ai)
-            if hasattr(agent, "update_memory"):
-                agent.update_memory(resolved_turn, logs)
+        resolved_logs = game.handler.resolve_simultaneous_turn()
+        logs = intent_logs + resolved_logs
 
         elapsed = time.time() - t0
+        resolved_turn = game.state.turn - 1
         turn_timings.append(elapsed)
         active = sum(1 for n in game.state.nations.values() if not n.is_defeated)
 
